@@ -1,0 +1,9 @@
+# .gitignore
+# Ignore Python bytecode files
+__pycache__/
+.venv
+venv
+*.pyc
+*.pyo
+*.pyd
+*.pdb
