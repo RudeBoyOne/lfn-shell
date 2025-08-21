@@ -1,6 +1,5 @@
 from typing import Optional, List, Tuple
 import re
-import subprocess
 import sys
 
 from gi.repository import GdkPixbuf, GLib, Gtk
@@ -160,6 +159,56 @@ class ClipBar(Box):
             else:
                 ctx.remove_class("suggested-action")
                 content.style = "padding: 8px; border-radius: 8px;"
+        # rola a scroll view para mostrar o item selecionado (se houver)
+        try:
+            if 0 <= sel < len(self._buttons):
+                btn = self._buttons[sel]
+                # certifica-se que o botão está visível horizontalmente
+                hadj = self.scroll.get_hadjustment()
+                alloc = btn.get_allocation()
+                view_x = hadj.get_value()
+                view_w = int(hadj.get_page_size())
+                item_x = alloc.x
+                item_w = alloc.width
+                # se item está à esquerda do view ou à direita, ajuste
+                if item_x < view_x:
+                    hadj.set_value(max(0, item_x))
+                elif item_x + item_w > view_x + view_w:
+                    hadj.set_value(min(hadj.get_upper() - view_w, item_x + item_w - view_w))
+                # garantir foco no botão selecionado
+                try:
+                    btn.grab_focus()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def focus_selected(self):
+        """Traz o item selecionado à vista e foca o botão correspondente.
+
+        Separado de `_apply_selection_styles` para permitir agendamento via
+        `GLib.idle_add` quando necessário (por exemplo, depois de um key event).
+        """
+        try:
+            sel = self.controller.selected_index if self.controller else -1
+            if 0 <= sel < len(self._buttons):
+                btn = self._buttons[sel]
+                hadj = self.scroll.get_hadjustment()
+                alloc = btn.get_allocation()
+                view_x = hadj.get_value()
+                view_w = int(hadj.get_page_size())
+                item_x = alloc.x
+                item_w = alloc.width
+                if item_x < view_x:
+                    hadj.set_value(max(0, item_x))
+                elif item_x + item_w > view_x + view_w:
+                    hadj.set_value(min(hadj.get_upper() - view_w, item_x + item_w - view_w))
+                try:
+                    btn.grab_focus()
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     def _is_image_data(self, content: str) -> bool:
         return (
@@ -174,9 +223,24 @@ class ClipBar(Box):
     def _load_image_preview_async(self, item_id, button):
         def load():
             try:
-                result = subprocess.run(["cliphist", "decode", item_id], capture_output=True, check=True)
+                # Decodifica via controller apenas; não executar subprocess aqui.
+                raw = None
+                if self.controller and hasattr(self.controller, "decode_item"):
+                    try:
+                        raw = self.controller.decode_item(item_id)
+                    except Exception as e:
+                        # falha ao decodificar no controller -> não carregar preview
+                        print(f"[clipbar] controller.decode_item falhou: {e}", file=sys.stderr)
+                        raw = None
+
+                # se não obtemos bytes válidos, aborta sem chamar subprocess
+                if not raw:
+                    return False
+
                 loader = GdkPixbuf.PixbufLoader()
-                loader.write(result.stdout)
+                if isinstance(raw, str):
+                    raw = raw.encode("utf-8", errors="ignore")
+                loader.write(raw)
                 loader.close()
                 pixbuf = loader.get_pixbuf()
 

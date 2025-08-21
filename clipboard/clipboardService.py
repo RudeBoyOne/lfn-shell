@@ -93,8 +93,12 @@ class ClipboardService(Service):
         if not self.items:
             return
         idx = self.selected_index if self.selected_index >= 0 else 0
-        idx = (idx + delta) % len(self.items)
-        self.selected_index = idx
+        new_idx = idx + delta
+        # não permitir navegação circular: clamp entre 0 e len(items)-1
+        new_idx = max(0, min(new_idx, len(self.items) - 1))
+        # se não mudou, não reatribui (evita notify desnecessário)
+        if new_idx != idx:
+            self.selected_index = new_idx
 
     # ativar/colar
     def activate(self):
@@ -119,6 +123,19 @@ class ClipboardService(Service):
             subprocess.run(["wl-copy"], input=result.stdout, check=True)
         except subprocess.CalledProcessError:
             pass
+
+    def decode_item(self, item_id: str) -> bytes:
+        """Decode an item using cliphist and return raw bytes.
+
+        Centraliza a chamada ao `cliphist decode` para que outros componentes
+        (por exemplo, UI) não executem subprocess diretamente.
+        Retorna bytes vazios em caso de falha.
+        """
+        try:
+            result = subprocess.run(["cliphist", "decode", item_id], capture_output=True, check=True)
+            return result.stdout
+        except subprocess.CalledProcessError:
+            return b""
 
     def delete_current(self):
         if not self.items or self.selected_index < 0:

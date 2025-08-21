@@ -7,3 +7,4 @@ venv
 *.pyo
 *.pyd
 *.pdb
+.github/
