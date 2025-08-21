@@ -10,11 +10,11 @@ from fabric.widgets.image import Image
 from fabric.widgets.label import Label
 from fabric.widgets.scrolledwindow import ScrolledWindow
 
-from clipboardService import ClipboardService
+from clipboard.clipboardService import ClipboardService
 
 
 class ClipBar(Box):
-    def __init__(self, max_items=50, bar_height=56, item_width=260, controller: Optional[ClipboardService] = None, **kwargs):
+    def __init__(self, max_items=50, bar_height=56, item_width=260, controller: Optional[ClipboardService] = None, item_height: Optional[int] = None, **kwargs):
         super().__init__(
             name="clipbar-root",
             spacing=6,
@@ -26,17 +26,20 @@ class ClipBar(Box):
 
         self.bar_height = bar_height
         self.item_width = item_width
+        # item_height defaulta para bar_height menos padding se não informado
+        self.item_height = item_height or max(56, self.bar_height - 4)
         self.max_items = max_items
 
         # linha de itens (não expandir horizontal para permitir overflow)
         self.row = Box(
             name="clipbar-row",
             orientation="h",
-            spacing=6,
+            spacing=16,  # espaçamento maior entre cards
             h_expand=False,
             v_expand=True,
             h_align="fill",
             v_align="fill",
+            style="padding: 12px 12px;",  # mais espaçamento entre a borda do scroll e os cards
         )
 
         # ScrolledWindow com barras visíveis
@@ -91,22 +94,23 @@ class ClipBar(Box):
 
             if is_img:
                 content_box = Box(
-                    orientation="h",
-                    spacing=6,
+                    orientation="v",  # empilha imagem acima do texto (card)
+                    spacing=8,
                     children=[
                         Image(name="clipbar-thumb"),
                         Label(name="clipbar-text", label="[Imagem]", ellipsization="end"),
                     ],
-                    style="padding: 8px; border-radius: 8px;",
+                    style="padding: 10px; border-radius: 10px; background-color: rgba(0,0,0,0.02);",
                 )
             else:
                 display = content.strip()
-                if len(display) > 80:
-                    display = display[:77] + "..."
+                if len(display) > 200:
+                    display = display[:197] + "..."
                 content_box = Box(
-                    orientation="h",
+                    orientation="v",  # texto centralizado embaixo
+                    spacing=6,
                     children=[Label(name="clipbar-text", label=display, ellipsization="end")],
-                    style="padding: 8px; border-radius: 8px;",
+                    style="padding: 10px; border-radius: 10px; background-color: rgba(0,0,0,0.02);",
                 )
 
             btn = Button(
@@ -114,10 +118,11 @@ class ClipBar(Box):
                 child=content_box,
                 tooltip_text="[Imagem]" if is_img else content.strip(),
                 on_clicked=lambda *_, i=idx: (self.controller.activate_index(i) if self.controller else None),
-                v_expand=True,
-                v_align="fill",
+                v_expand=False,
+                v_align="start",
             )
-            btn.set_size_request(self.item_width, -1)
+            # agora define altura fixa maior para dar aspecto de card
+            btn.set_size_request(self.item_width, self.item_height)
             btn.set_can_focus(True)
 
             self.row.add(btn)
@@ -160,13 +165,13 @@ class ClipBar(Box):
                 loader.close()
                 pixbuf = loader.get_pixbuf()
 
-                padding = 12
-                max_size = max(1, min(72, self.bar_height - padding))
+                padding = 16
+                # limitar preview ao tamanho do card (largura menos padding, altura menos espaço para texto)
+                max_w = max(1, self.item_width - padding)
+                max_h = max(1, self.item_height - 48)
                 w, h = pixbuf.get_width(), pixbuf.get_height()
-                if w > h:
-                    nw, nh = max_size, int(h * (max_size / w))
-                else:
-                    nh, nw = max_size, int(w * (max_size / h))
+                scale = min(max_w / w, max_h / h, 1.0)
+                nw, nh = max(1, int(w * scale)), max(1, int(h * scale))
                 pixbuf = pixbuf.scale_simple(nw, nh, GdkPixbuf.InterpType.BILINEAR)
 
                 box = button.get_child()
