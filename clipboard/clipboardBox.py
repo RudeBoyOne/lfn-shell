@@ -104,13 +104,28 @@ class ClipBar(Box):
                 )
             else:
                 display = content.strip()
-                if len(display) > 200:
-                    display = display[:197] + "..."
+                # aumentar quantidade mostrada e permitir quebra de linha
+                if len(display) > 600:
+                    display = display[:597] + "..."
                 content_box = Box(
-                    orientation="v",  # texto centralizado embaixo
+                    orientation="v",
                     spacing=6,
-                    children=[Label(name="clipbar-text", label=display, ellipsization="end")],
-                    style="padding: 10px; border-radius: 10px; background-color: rgba(0,0,0,0.02);",
+                    h_expand=True,
+                    v_expand=True,
+                    h_align="center",
+                    v_align="center",  # centraliza verticalmente o texto no card
+                    children=[
+                        Label(
+                            name="clipbar-text",
+                            label=display,
+                            ellipsization="end",
+                            wrap=True,  # permite múltiplas linhas
+                            xalign=0.5,
+                            yalign=0.5,
+                            style="font-size:14px; padding:4px;",
+                        )
+                    ],
+                    style="padding: 12px; border-radius: 10px; background-color: rgba(0,0,0,0.02);",
                 )
 
             btn = Button(
@@ -119,7 +134,7 @@ class ClipBar(Box):
                 tooltip_text="[Imagem]" if is_img else content.strip(),
                 on_clicked=lambda *_, i=idx: (self.controller.activate_index(i) if self.controller else None),
                 v_expand=False,
-                v_align="start",
+                v_align="center",
             )
             # agora define altura fixa maior para dar aspecto de card
             btn.set_size_request(self.item_width, self.item_height)
