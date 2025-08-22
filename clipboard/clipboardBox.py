@@ -92,11 +92,15 @@ class ClipBar(Box):
             is_img = self._is_image_data(content)
 
             if is_img:
+                # centraliza a imagem dentro do card (horizontal e verticalmente)
                 content_box = Box(
-                    orientation="v",  # empilha imagem acima do texto (card)
+                    orientation="v",  # empilha conteúdo verticalmente
                     spacing=8,
-                    
-                    children=Image(name="clipbar-thumb"),
+                    h_expand=True,
+                    v_expand=True,
+                    h_align="center",
+                    v_align="center",
+                    children=[Image(name="clipbar-thumb")],
                     style="padding: 10px; border-radius: 10px; background-color: rgba(0,0,0,0.02);",
                 )
             else:
