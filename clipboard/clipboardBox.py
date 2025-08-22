@@ -95,10 +95,8 @@ class ClipBar(Box):
                 content_box = Box(
                     orientation="v",  # empilha imagem acima do texto (card)
                     spacing=8,
-                    children=[
-                        Image(name="clipbar-thumb"),
-                        Label(name="clipbar-text", label="[Imagem]", ellipsization="end"),
-                    ],
+                    
+                    children=Image(name="clipbar-thumb"),
                     style="padding: 10px; border-radius: 10px; background-color: rgba(0,0,0,0.02);",
                 )
             else:
