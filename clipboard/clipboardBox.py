@@ -104,6 +104,12 @@ class ClipBar(Box):
                 pass
 
     def _render_items(self):
+        # preservar foco do campo de busca (se houver) antes de reconstruir
+        try:
+            self._search_was_focused = bool(getattr(self, "search_entry", None) and self.search_entry.has_focus())
+        except Exception:
+            self._search_was_focused = False
+
         # limpa
         self.row.children = []
         self._buttons.clear()
@@ -146,76 +152,131 @@ class ClipBar(Box):
 
         if not render_candidates:
             msg = "(Clipboard vazio)" if not all_items else "(nenhum resultado)"
-            self.row.add(Label(name="clipbar-empty", label=msg))
-            self.show_all()
-            return
-        # reset mapping
-        self._rendered_orig_indices = []
-
-        for render_idx, (orig_idx, item_id, content) in enumerate(render_candidates):
-            is_img = self._is_image_data(content)
-
-            if is_img:
-                # centraliza a imagem dentro do card (horizontal e verticalmente)
-                content_box = Box(
-                    orientation="v",  # empilha conteúdo verticalmente
-                    spacing=8,
-                    h_expand=True,
-                    v_expand=True,
-                    h_align="center",
-                    v_align="center",
-                    children=[Image(name="clipbar-thumb")],
-                    style_classes="clipbar-image-card",
-                )
-            else:
-                display = content.strip()
-                # aumentar quantidade mostrada e permitir quebra de linha
-                if len(display) > 600:
-                    display = display[:597] + "..."
-                content_box = Box(
-                    orientation="v",
-                    spacing=6,
-                    h_expand=True,
-                    v_expand=True,
-                    h_align="center",
-                    v_align="center",  # centraliza verticalmente o texto no card
-                    children=[
-                        Label(
-                            name="clipbar-text",
-                            label=display,
-                            ellipsization="end",
-                            wrap=True,  # permite múltiplas linhas
-                            xalign=0.5,
-                            yalign=0.5,
-                            style_classes="clipbar-text-label",
-                        )
-                    ],
-                    style_classes="clipbar-text-card",
-                )
-
-            btn = Button(
-                name="clipbar-item",
-                child=content_box,
-                tooltip_text="[Imagem]" if is_img else (content or "").strip(),
-                on_clicked=lambda *_, i=orig_idx: (self.controller.activate_index(i) if self.controller else None),
-                v_expand=False,
+            # Mantém a altura do clipbar estável: adiciona uma caixa placeholder
+            # que ocupa o mesmo espaço dos cards e centraliza a mensagem.
+            empty_box = Box(
+                orientation="v",
+                h_expand=True,
+                v_expand=True,
+                h_align="center",
                 v_align="center",
             )
-            # agora define altura fixa maior para dar aspecto de card
-            # definir altura do botão com a altura calculada (ajustada para textos longos)
-            btn.set_size_request(self.item_width, computed_item_height)
-            btn.set_can_focus(True)
+            try:
+                # solicita espaço similar ao tamanho computado dos items
+                empty_box.set_size_request(self.item_width, computed_item_height)
+            except Exception:
+                pass
+            lbl = Label(
+                name="clipbar-empty",
+                label=msg,
+                xalign=0.5,
+                yalign=0.5,
+                style_classes="clipbar-empty-label",
+            )
+            try:
+                empty_box.add(lbl)
+            except Exception:
+                empty_box.children = [lbl]
+            self.row.add(empty_box)
+            self.show_all()
+            # restaurar foco no campo de busca se ele estava ativo antes da render
+            try:
+                if getattr(self, "_search_was_focused", False):
+                    GLib.idle_add(lambda: (self.search_entry.grab_focus(), False)[1])
+            except Exception:
+                pass
+            return
+        # reset mapping
+        # Reuse existing buttons/widgets where possible to avoid focus loss.
+        self._rendered_orig_indices = []
 
-            self.row.add(btn)
-            self._buttons.append(btn)
-            self._content_boxes.append(content_box)
-            self._rendered_orig_indices.append(orig_idx)
+        # Ensure we have enough button widgets allocated
+        needed = len(render_candidates)
+        while len(self._buttons) < needed:
+            # create placeholder content box and button
+            placeholder_box = Box(orientation="v", spacing=6, h_expand=True, v_expand=True, h_align="center", v_align="center")
+            new_btn = Button(name="clipbar-item", child=placeholder_box, v_expand=False, v_align="center")
+            new_btn.set_can_focus(True)
+            # append but don't add to row yet; we'll manage visibility below
+            self._buttons.append(new_btn)
+            self._content_boxes.append(placeholder_box)
+
+        # Update or add buttons according to render_candidates
+        for idx, (orig_idx, item_id, content) in enumerate(render_candidates):
+            is_img = self._is_image_data(content)
+            btn = self._buttons[idx]
+            content_box = self._content_boxes[idx]
+
+            # clear current children of content_box
+            try:
+                for child in list(content_box.get_children()):
+                    try:
+                        content_box.remove(child)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
             if is_img:
-                self._load_image_preview_async(item_id, btn)
+                img = Image(name="clipbar-thumb")
+                try:
+                    content_box.add(img)
+                except Exception:
+                    # fallback: set child directly
+                    content_box.children = [img]
+                # load preview async
+                try:
+                    self._load_image_preview_async(item_id, btn)
+                except Exception:
+                    pass
+            else:
+                display = (content or "").strip()
+                if len(display) > 600:
+                    display = display[:597] + "..."
+                lbl = Label(name="clipbar-text", label=display, ellipsization="end", wrap=True, xalign=0.5, yalign=0.5, style_classes="clipbar-text-label")
+                try:
+                    content_box.add(lbl)
+                except Exception:
+                    content_box.children = [lbl]
+
+            # ensure button is added to row and visible
+            try:
+                if btn.get_parent() is None:
+                    self.row.add(btn)
+                btn.set_size_request(self.item_width, computed_item_height)
+                btn.set_tooltip_text("[Imagem]" if is_img else (content or "").strip())
+                # update onclick to point to the correct original index
+                try:
+                    btn.connect("clicked", lambda _btn, _i=orig_idx: (self.controller.activate_index(_i) if self.controller else None))
+                except Exception:
+                    # Some Button implementations accept on_clicked in constructor only
+                    pass
+                try:
+                    btn.show()
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
+            self._rendered_orig_indices.append(orig_idx)
+
+        # hide any leftover buttons
+        for j in range(len(render_candidates), len(self._buttons)):
+            try:
+                self._buttons[j].hide()
+            except Exception:
+                pass
 
         self.show_all()
         self._apply_selection_styles()
+
+        # restaurar foco no campo de busca se ele estava ativo antes da render
+        try:
+            if getattr(self, "_search_was_focused", False):
+                # agendar via idle para não interromper o fluxo de eventos atual
+                GLib.idle_add(lambda: (self.search_entry.grab_focus(), False)[1])
+        except Exception:
+            pass
 
     def _apply_selection_styles(self):
         sel = self.controller.selected_index if self.controller else -1
@@ -245,7 +306,11 @@ class ClipBar(Box):
                     hadj.set_value(min(hadj.get_upper() - view_w, item_x + item_w - view_w))
                 # garantir foco no botão selecionado
                 try:
-                    btn.grab_focus()
+                    # se o campo de busca estiver focado, não roube o foco do usuário
+                    if getattr(self, "search_entry", None) and self.search_entry.has_focus():
+                        pass
+                    else:
+                        btn.grab_focus()
                 except Exception:
                     pass
         except Exception:
@@ -346,7 +411,7 @@ class ClipBar(Box):
         except Exception:
             pass
 
-    def _schedule_search_update(self, debounce_ms: int = 200):
+    def _schedule_search_update(self, debounce_ms: int = 300):
         """Agenda um timeout debounced para aplicar o filtro da busca.
 
         Se já houver um timeout agendado, cancela e re-agenda.
