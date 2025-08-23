@@ -34,17 +34,17 @@ class ClipBar(Box):
             **kwargs,
         )
 
+        # configurações básicas
         self.bar_height = bar_height
         self.item_width = item_width
-        # item_height defaulta para bar_height menos padding se não informado
         self.item_height = item_height or max(56, self.bar_height - 4)
         self.max_items = max_items
 
-        # linha de itens (não expandir horizontal para permitir overflow)
+        # linha de itens
         self.row = Box(
             name="clipbar-row",
             orientation="h",
-            spacing=16,  # espaçamento maior entre cards
+            spacing=16,
             h_expand=False,
             v_expand=True,
             h_align="fill",
@@ -52,7 +52,7 @@ class ClipBar(Box):
             style_classes="clipbar-row-padding",
         )
 
-        # ScrolledWindow com barras visíveis
+        # scroller
         self.scroll = ScrolledWindow(
             name="clipbar-scroll",
             child=self.row,
@@ -63,30 +63,28 @@ class ClipBar(Box):
             propagate_width=False,
             propagate_height=False,
         )
-        # barras horizontais visíveis quando necessário; sem overlay
         self.scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
         try:
             self.scroll.set_overlay_scrolling(False)
         except Exception:
             pass
 
-        # campo de busca acima da lista (debounced)
+        # campo de busca (centralizado, com debounce e foco ao abrir)
         self.search_entry = Entry(placeholder="Buscar...", style_classes="clipbar-search", h_expand=True)
-        # cada mudança agenda um debounce; implementado em _schedule_search_update
         self.search_entry.connect("changed", lambda *_: self._schedule_search_update())
+        # wrapper leve para centralizar horizontalmente sem alterar estilos globais
+        search_wrap = Box(orientation="h", h_expand=True, h_align="center", children=[self.search_entry])
 
-        self.add(self.search_entry)
+        # montar layout
+        self.add(search_wrap)
         self.add(self.scroll)
         self.set_size_request(-1, self.bar_height)
 
         # estado UI
-        self._buttons: List[Button] = []
-        self._content_boxes: List[Box] = []
-        # mapeamento: posição renderizada -> índice original em controller.items
-        self._rendered_orig_indices: List[int] = []
-        # filtro atual (lowercase)
-        self._filter_text: str = ""
-        # debounce id para a busca (GLib.timeout_add)
+        self._buttons = []
+        self._content_boxes = []
+        self._rendered_orig_indices = []
+        self._filter_text = ""
         self._search_debounce_id = 0
 
         # integra com o Service
@@ -95,14 +93,12 @@ class ClipBar(Box):
             self.controller.connect("notify::items", lambda *_: self._render_items())
             self.controller.connect("notify::selected-index", lambda *_: self._apply_selection_styles())
 
-        # render inicial
+        # render inicial e foco
         self._render_items()
-        # garantir foco no campo de busca quando o ClipBar abrir
         try:
             GLib.idle_add(self._focus_search_entry)
         except Exception:
             try:
-                # fallback direto
                 self.search_entry.grab_focus()
             except Exception:
                 pass
