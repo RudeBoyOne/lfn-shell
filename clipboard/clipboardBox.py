@@ -2,10 +2,21 @@ from typing import Optional, List, Tuple
 import re
 import sys
 
+import gi
+try:
+    gi.require_version("GdkPixbuf", "2.0")
+except Exception:
+    pass
+try:
+    gi.require_version("Gtk", "3.0")
+except Exception:
+    # if Gtk already loaded (e.g. Gtk 4), allow fallback and hope the runtime is compatible
+    pass
 from gi.repository import GdkPixbuf, GLib, Gtk
 from fabric.widgets.box import Box
 from fabric.widgets.button import Button
 from fabric.widgets.image import Image
+from fabric.widgets.entry import Entry
 from fabric.widgets.label import Label
 from fabric.widgets.scrolledwindow import ScrolledWindow
 
@@ -59,12 +70,24 @@ class ClipBar(Box):
         except Exception:
             pass
 
+        # campo de busca acima da lista (debounced)
+        self.search_entry = Entry(placeholder="Buscar...", style_classes="clipbar-search", h_expand=True)
+        # cada mudança agenda um debounce; implementado em _schedule_search_update
+        self.search_entry.connect("changed", lambda *_: self._schedule_search_update())
+
+        self.add(self.search_entry)
         self.add(self.scroll)
         self.set_size_request(-1, self.bar_height)
 
         # estado UI
         self._buttons: List[Button] = []
         self._content_boxes: List[Box] = []
+        # mapeamento: posição renderizada -> índice original em controller.items
+        self._rendered_orig_indices: List[int] = []
+        # filtro atual (lowercase)
+        self._filter_text: str = ""
+        # debounce id para a busca (GLib.timeout_add)
+        self._search_debounce_id = 0
 
         # integra com o Service
         self.controller = controller
@@ -74,6 +97,15 @@ class ClipBar(Box):
 
         # render inicial
         self._render_items()
+        # garantir foco no campo de busca quando o ClipBar abrir
+        try:
+            GLib.idle_add(self._focus_search_entry)
+        except Exception:
+            try:
+                # fallback direto
+                self.search_entry.grab_focus()
+            except Exception:
+                pass
 
     def _render_items(self):
         # limpa
@@ -81,16 +113,24 @@ class ClipBar(Box):
         self._buttons.clear()
         self._content_boxes.clear()
 
-        items = (self.controller.items if self.controller else [])[: self.max_items]
+        # coleta itens do service e aplica filtro (case-insensitive)
+        all_items = (self.controller.items if self.controller else [])
+        if self._filter_text:
+            filtered = [(i, itm_id, txt) for i, (itm_id, txt) in enumerate(all_items) if self._filter_text in (txt or "").lower()]
+        else:
+            filtered = [(i, itm_id, txt) for i, (itm_id, txt) in enumerate(all_items)]
+
+        # aplicar limite de max_items
+        render_candidates = filtered[: self.max_items]
 
         # calcular altura desejada para os items de texto (wrap)
         # heurística: calcular número de linhas aproximado a partir do comprimento do texto
         max_text_lines = 0
-        if items:
+        if render_candidates:
             chars_per_line = max(20, max(10, self.item_width // 8))
-            for _, content in items:
+            for _, _, content in render_candidates:
                 if not self._is_image_data(content):
-                    display_len = len(content.strip())
+                    display_len = len((content or "").strip())
                     lines = min(6, max(1, (display_len // chars_per_line) + 1))
                     if lines > max_text_lines:
                         max_text_lines = lines
@@ -108,12 +148,15 @@ class ClipBar(Box):
         except Exception:
             pass
 
-        if not items:
-            self.row.add(Label(name="clipbar-empty", label="(Clipboard vazio)"))
+        if not render_candidates:
+            msg = "(Clipboard vazio)" if not all_items else "(nenhum resultado)"
+            self.row.add(Label(name="clipbar-empty", label=msg))
             self.show_all()
             return
+        # reset mapping
+        self._rendered_orig_indices = []
 
-        for idx, (item_id, content) in enumerate(items):
+        for render_idx, (orig_idx, item_id, content) in enumerate(render_candidates):
             is_img = self._is_image_data(content)
 
             if is_img:
@@ -157,8 +200,8 @@ class ClipBar(Box):
             btn = Button(
                 name="clipbar-item",
                 child=content_box,
-                tooltip_text="[Imagem]" if is_img else content.strip(),
-                on_clicked=lambda *_, i=idx: (self.controller.activate_index(i) if self.controller else None),
+                tooltip_text="[Imagem]" if is_img else (content or "").strip(),
+                on_clicked=lambda *_, i=orig_idx: (self.controller.activate_index(i) if self.controller else None),
                 v_expand=False,
                 v_align="center",
             )
@@ -170,6 +213,7 @@ class ClipBar(Box):
             self.row.add(btn)
             self._buttons.append(btn)
             self._content_boxes.append(content_box)
+            self._rendered_orig_indices.append(orig_idx)
 
             if is_img:
                 self._load_image_preview_async(item_id, btn)
@@ -290,3 +334,59 @@ class ClipBar(Box):
                 print(f"[clipbar] erro carregando preview: {e}", file=sys.stderr)
             return False
         GLib.idle_add(load)
+
+    def _on_search_changed(self, *args):
+        """Handler chamado quando o texto de busca muda; atualiza o filtro e re-renderiza."""
+        # obter texto em lowercase para busca case-insensitive
+        try:
+            text = (self.search_entry.get_text() or "").strip().lower()
+        except Exception:
+            text = ""
+        # armazenar e atualizar view na thread principal
+        self._filter_text = text
+        # re-renderiza (proteção leve para evitar crashes durante digitação)
+        try:
+            self._render_items()
+        except Exception:
+            pass
+
+    def _schedule_search_update(self, debounce_ms: int = 200):
+        """Agenda um timeout debounced para aplicar o filtro da busca.
+
+        Se já houver um timeout agendado, cancela e re-agenda.
+        """
+        try:
+            # remove qualquer agendamento anterior
+            if getattr(self, "_search_debounce_id", 0):
+                try:
+                    GLib.source_remove(self._search_debounce_id)
+                except Exception:
+                    pass
+            # agenda novo timeout
+            self._search_debounce_id = GLib.timeout_add(int(debounce_ms), self._perform_debounced_search)
+        except Exception:
+            # fallback: chamada direta sem debounce
+            GLib.idle_add(self._on_search_changed)
+
+    def _perform_debounced_search(self):
+        """Executa a atualização de busca agendada. Retorna False para não repetir a timeout."""
+        try:
+            self._on_search_changed()
+        except Exception:
+            pass
+        # reset id e evitar re-execução
+        try:
+            self._search_debounce_id = 0
+        except Exception:
+            pass
+        return False
+
+    def _focus_search_entry(self):
+        """Tenta focar o campo de busca; usado via GLib.idle_add após criação."""
+        try:
+            if hasattr(self, "search_entry") and self.search_entry:
+                self.search_entry.grab_focus()
+                return False
+        except Exception:
+            pass
+        return False
