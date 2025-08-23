@@ -1,17 +1,20 @@
 from typing import Optional, List, Tuple
 import re
 import sys
+import logging
 
 import gi
+logger = logging.getLogger(__name__)
 try:
     gi.require_version("GdkPixbuf", "2.0")
 except Exception:
-    pass
+    # pode falhar em ambientes sem GdkPixbuf; registrar em debug para diagnóstico
+    logger.debug("gi.require_version GdkPixbuf failed", exc_info=True)
 try:
     gi.require_version("Gtk", "3.0")
 except Exception:
-    # if Gtk already loaded (e.g. Gtk 4), allow fallback and hope the runtime is compatible
-    pass
+    # if Gtk already loaded (e.g. Gtk 4), allow fallback; registrar em debug
+    logger.debug("gi.require_version Gtk failed (fallback possible)", exc_info=True)
 from gi.repository import GdkPixbuf, GLib, Gtk
 from fabric.widgets.box import Box
 from fabric.widgets.button import Button
@@ -24,6 +27,11 @@ from clipboard.clipboardService import ClipboardService
 
 
 class ClipBar(Box):
+    """Barra horizontal de clipes.
+
+    Mapeamento de botões: cada botão recebe um único handler `_on_button_clicked`
+    e seu índice atual é armazenado em `btn._mapped_index` durante a renderização.
+    """
     def __init__(self, max_items=50, bar_height=56, item_width=260, controller: Optional[ClipboardService] = None, item_height: Optional[int] = None, **kwargs):
         super().__init__(
             name="clipbar-root",
@@ -67,7 +75,7 @@ class ClipBar(Box):
         try:
             self.scroll.set_overlay_scrolling(False)
         except Exception:
-            pass
+            logger.debug("set_overlay_scrolling not supported", exc_info=True)
 
         # campo de busca (centralizado, com debounce e foco ao abrir)
         self.search_entry = Entry(placeholder="Buscar...", style_classes="clipbar-search", h_expand=True)
@@ -98,10 +106,11 @@ class ClipBar(Box):
         try:
             GLib.idle_add(self._focus_search_entry)
         except Exception:
+            logger.debug("GLib.idle_add(_focus_search_entry) failed, trying direct grab_focus", exc_info=True)
             try:
                 self.search_entry.grab_focus()
             except Exception:
-                pass
+                logger.debug("search_entry.grab_focus() failed", exc_info=True)
 
     def _render_items(self):
         # preservar foco do campo de busca (se houver) antes de reconstruir
@@ -110,10 +119,8 @@ class ClipBar(Box):
         except Exception:
             self._search_was_focused = False
 
-        # limpa
-        self.row.children = []
-        self._buttons.clear()
-        self._content_boxes.clear()
+    # não limpar listas para permitir reuso de widgets entre renders (previne perda de foco)
+    # apenas garantimos que a row existe; botões serão escondidos quando necessário.
 
         # coleta itens do service e aplica filtro (case-insensitive)
         all_items = (self.controller.items if self.controller else [])
@@ -152,6 +159,31 @@ class ClipBar(Box):
 
         if not render_candidates:
             msg = "(Clipboard vazio)" if not all_items else "(nenhum resultado)"
+            # Esconde todos os botões existentes (se houver) para que apenas o
+            # placeholder seja visível. Também remove placeholders antigos para
+            # evitar duplicação.
+            try:
+                for btn in self._buttons:
+                    try:
+                        btn.hide()
+                        try:
+                            setattr(btn, "_mapped_index", None)
+                        except Exception:
+                            pass
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            try:
+                for child in list(self.row.get_children()):
+                    try:
+                        if getattr(child, "get_name", None) and child.get_name() == "clipbar-empty":
+                            self.row.remove(child)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
             # Mantém a altura do clipbar estável: adiciona uma caixa placeholder
             # que ocupa o mesmo espaço dos cards e centraliza a mensagem.
             empty_box = Box(
@@ -197,6 +229,16 @@ class ClipBar(Box):
             placeholder_box = Box(orientation="v", spacing=6, h_expand=True, v_expand=True, h_align="center", v_align="center")
             new_btn = Button(name="clipbar-item", child=placeholder_box, v_expand=False, v_align="center")
             new_btn.set_can_focus(True)
+            # garante estado inicial e conecta handler de clique apenas uma vez;
+            # o índice real é atualizado em tempo de render via `btn._mapped_index`.
+            try:
+                setattr(new_btn, "_mapped_index", None)
+            except Exception:
+                logger.debug("could not initialize _mapped_index on new_btn", exc_info=True)
+            try:
+                new_btn.connect("clicked", lambda _btn, *_: self._on_button_clicked(_btn))
+            except Exception:
+                logger.debug("failed to connect clicked handler to new_btn", exc_info=True)
             # append but don't add to row yet; we'll manage visibility below
             self._buttons.append(new_btn)
             self._content_boxes.append(placeholder_box)
@@ -213,9 +255,9 @@ class ClipBar(Box):
                     try:
                         content_box.remove(child)
                     except Exception:
-                        pass
+                        logger.debug("failed to remove child from content_box", exc_info=True)
             except Exception:
-                pass
+                logger.debug("failed while iterating content_box children", exc_info=True)
 
             if is_img:
                 img = Image(name="clipbar-thumb")
@@ -228,7 +270,7 @@ class ClipBar(Box):
                 try:
                     self._load_image_preview_async(item_id, btn)
                 except Exception:
-                    pass
+                    logger.debug("failed to schedule image preview load", exc_info=True)
             else:
                 display = (content or "").strip()
                 if len(display) > 600:
@@ -245,25 +287,32 @@ class ClipBar(Box):
                     self.row.add(btn)
                 btn.set_size_request(self.item_width, computed_item_height)
                 btn.set_tooltip_text("[Imagem]" if is_img else (content or "").strip())
-                # update onclick to point to the correct original index
+                # Atualiza mapeamento do botão para a origem atual; o handler único
+                # criado acima usará este atributo para ativar o índice correto.
                 try:
-                    btn.connect("clicked", lambda _btn, _i=orig_idx: (self.controller.activate_index(_i) if self.controller else None))
+                    setattr(btn, "_mapped_index", orig_idx)
                 except Exception:
-                    # Some Button implementations accept on_clicked in constructor only
                     pass
                 try:
                     btn.show()
                 except Exception:
-                    pass
+                    logger.debug("failed calling btn.show()", exc_info=True)
             except Exception:
                 pass
 
             self._rendered_orig_indices.append(orig_idx)
 
-        # hide any leftover buttons
+        # hide any leftover buttons and clear their mapped index to avoid stale mapping
         for j in range(len(render_candidates), len(self._buttons)):
             try:
-                self._buttons[j].hide()
+                try:
+                    self._buttons[j].hide()
+                except Exception:
+                    pass
+                try:
+                    setattr(self._buttons[j], "_mapped_index", None)
+                except Exception:
+                    pass
             except Exception:
                 pass
 
@@ -353,6 +402,23 @@ class ClipBar(Box):
             or ("binary" in content.lower() and any(ext in content.lower() for ext in ["jpg", "jpeg", "png", "bmp", "gif"]))
         )
 
+    def _on_button_clicked(self, btn):
+        """Handler único conectado a todos os botões; usa o atributo
+        `btn._mapped_index` (atualizado em tempo de render) para ativar
+        o índice correto no controller.
+        """
+        try:
+            idx = getattr(btn, "_mapped_index", None)
+            if idx is None:
+                return
+            if self.controller and hasattr(self.controller, "activate_index"):
+                try:
+                    self.controller.activate_index(idx)
+                except Exception:
+                    logger.debug("controller.activate_index failed", exc_info=True)
+        except Exception:
+            logger.debug("error in _on_button_clicked", exc_info=True)
+
     def _load_image_preview_async(self, item_id, button):
         def load():
             try:
@@ -363,7 +429,7 @@ class ClipBar(Box):
                         raw = self.controller.decode_item(item_id)
                     except Exception as e:
                         # falha ao decodificar no controller -> não carregar preview
-                        print(f"[clipbar] controller.decode_item falhou: {e}", file=sys.stderr)
+                        logger.exception("[clipbar] controller.decode_item falhou")
                         raw = None
 
                 # se não obtemos bytes válidos, aborta sem chamar subprocess
@@ -392,7 +458,7 @@ class ClipBar(Box):
                     if isinstance(img, Image):
                         img.set_from_pixbuf(pixbuf)
             except Exception as e:
-                print(f"[clipbar] erro carregando preview: {e}", file=sys.stderr)
+                logger.exception("[clipbar] erro carregando preview")
             return False
         GLib.idle_add(load)
 
@@ -409,9 +475,9 @@ class ClipBar(Box):
         try:
             self._render_items()
         except Exception:
-            pass
+            logger.exception("_render_items failed during search change")
 
-    def _schedule_search_update(self, debounce_ms: int = 300):
+    def _schedule_search_update(self, debounce_ms: int = 450):
         """Agenda um timeout debounced para aplicar o filtro da busca.
 
         Se já houver um timeout agendado, cancela e re-agenda.
@@ -448,6 +514,18 @@ class ClipBar(Box):
             if hasattr(self, "search_entry") and self.search_entry:
                 self.search_entry.grab_focus()
                 return False
+        except Exception:
+            pass
+        return False
+
+    def _restore_search_focus_if_needed(self):
+        """Restaura o foco no campo de busca se ele estava focado antes da render."""
+        try:
+            if getattr(self, "_search_was_focused", False) and hasattr(self, "search_entry") and self.search_entry:
+                try:
+                    self.search_entry.grab_focus()
+                except Exception:
+                    pass
         except Exception:
             pass
         return False

@@ -1,8 +1,11 @@
 import subprocess
 from typing import List, Tuple
+import logging
 
 from fabric.core.service import Service, Signal, Property
 from fabric import Fabricator
+
+logger = logging.getLogger(__name__)
 
 
 class ClipboardService(Service):
@@ -49,6 +52,7 @@ class ClipboardService(Service):
                 ).stdout
                 return out.strip()
             except subprocess.CalledProcessError:
+                logger.debug("cliphist list failed", exc_info=True)
                 return ""
 
         self._fabric = Fabricator(
@@ -122,7 +126,7 @@ class ClipboardService(Service):
             result = subprocess.run(["cliphist", "decode", item_id], capture_output=True, check=True)
             subprocess.run(["wl-copy"], input=result.stdout, check=True)
         except subprocess.CalledProcessError:
-            pass
+            logger.exception("paste_item failed for %s", item_id)
 
     def decode_item(self, item_id: str) -> bytes:
         """Decode an item using cliphist and return raw bytes.
@@ -135,6 +139,7 @@ class ClipboardService(Service):
             result = subprocess.run(["cliphist", "decode", item_id], capture_output=True, check=True)
             return result.stdout
         except subprocess.CalledProcessError:
+            logger.debug("decode_item failed for %s", item_id, exc_info=True)
             return b""
 
     def delete_current(self):
@@ -146,6 +151,8 @@ class ClipboardService(Service):
     def delete_item(self, item_id: str):
         try:
             subprocess.run(["cliphist", "delete", item_id], check=True)
+        except subprocess.CalledProcessError:
+            logger.exception("delete_item failed for %s", item_id)
         finally:
             # Fabricator vai atualizar no próximo tick
             pass

@@ -6,14 +6,17 @@ after creating the `app` instance in `main.py`.
 from gi.repository import Gio, GLib
 import os
 import sys
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def _apply_stylesheet(app, style_path: str):
     try:
         app.set_stylesheet_from_file(style_path)
-        print(f"[styles] applied stylesheet: {style_path}")
+        logger.info("[styles] applied stylesheet: %s", style_path)
     except Exception as e:
-        print(f"[styles] failed to apply stylesheet: {e}", file=sys.stderr)
+        logger.exception("[styles] failed to apply stylesheet")
 
 
 def start_styles_monitor(app, style_path: str = "./styles/style.css", debounce_ms: int = 250):
@@ -23,7 +26,7 @@ def start_styles_monitor(app, style_path: str = "./styles/style.css", debounce_m
     """
     style_dir = os.path.dirname(os.path.abspath(style_path))
     if not os.path.exists(style_dir):
-        print(f"[styles] styles dir does not exist: {style_dir}", file=sys.stderr)
+        logger.error("[styles] styles dir does not exist: %s", style_dir)
         return None
 
     # initial apply
@@ -47,8 +50,8 @@ def start_styles_monitor(app, style_path: str = "./styles/style.css", debounce_m
     try:
         monitor = gfile.monitor_directory(Gio.FileMonitorFlags.NONE, None)
         monitor.connect("changed", _on_changed)
-        print(f"[styles] watching {style_dir} for changes (debounce {debounce_ms}ms)")
+        logger.info("[styles] watching %s for changes (debounce %dms)", style_dir, debounce_ms)
         return monitor
     except Exception as e:
-        print(f"[styles] failed to start monitor: {e}", file=sys.stderr)
+        logger.exception("[styles] failed to start monitor")
         return None

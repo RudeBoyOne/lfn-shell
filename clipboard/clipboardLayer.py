@@ -33,29 +33,25 @@ class ClipboardLayer(Window):
         self.service = service
 
         # teclas -> Service
-        # wrappers que garantem que a UI reaplique estilos/foco mesmo quando
-        # a seleção não muda (evita que o foco suma ao tentar avançar além)
-        def _left(*_):
+        # helper para mover e agendar foco, reduz duplicação
+        def move_and_focus(delta: int):
             try:
-                self.service.move_left()
+                if delta < 0:
+                    self.service.move_left()
+                else:
+                    self.service.move_right()
             finally:
                 try:
-                    # agendar foco após o loop de eventos para evitar perda de foco
                     if hasattr(self, "child") and hasattr(self.child, "focus_selected"):
                         GLib.idle_add(self.child.focus_selected)
                 except Exception:
                     pass
 
+        def _left(*_):
+            move_and_focus(-1)
+
         def _right(*_):
-            try:
-                self.service.move_right()
-            finally:
-                try:
-                    # agendar foco após o loop de eventos para evitar perda de foco
-                    if hasattr(self, "child") and hasattr(self.child, "focus_selected"):
-                        GLib.idle_add(self.child.focus_selected)
-                except Exception:
-                    pass
+            move_and_focus(+1)
 
         self.add_keybinding("Left", _left)
         self.add_keybinding("Right", _right)
