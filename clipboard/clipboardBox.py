@@ -83,6 +83,31 @@ class ClipBar(Box):
 
         items = (self.controller.items if self.controller else [])[: self.max_items]
 
+        # calcular altura desejada para os items de texto (wrap)
+        # heurística: calcular número de linhas aproximado a partir do comprimento do texto
+        max_text_lines = 0
+        if items:
+            chars_per_line = max(20, max(10, self.item_width // 8))
+            for _, content in items:
+                if not self._is_image_data(content):
+                    display_len = len(content.strip())
+                    lines = min(6, max(1, (display_len // chars_per_line) + 1))
+                    if lines > max_text_lines:
+                        max_text_lines = lines
+
+        # se houver textos que demandam mais linhas, aumentamos a altura dos cards e do bar
+        if max_text_lines > 1:
+            line_height = 18  # px aproximado por linha para o tamanho de fonte atual
+            computed_item_height = max(self.item_height, max_text_lines * line_height + 24)
+        else:
+            computed_item_height = self.item_height
+
+        # ajustar a altura do clipbar (visual) para acomodar os cards maiores
+        try:
+            self.set_size_request(-1, max(self.bar_height, computed_item_height + 16))
+        except Exception:
+            pass
+
         if not items:
             self.row.add(Label(name="clipbar-empty", label="(Clipboard vazio)"))
             self.show_all()
@@ -138,7 +163,8 @@ class ClipBar(Box):
                 v_align="center",
             )
             # agora define altura fixa maior para dar aspecto de card
-            btn.set_size_request(self.item_width, self.item_height)
+            # definir altura do botão com a altura calculada (ajustada para textos longos)
+            btn.set_size_request(self.item_width, computed_item_height)
             btn.set_can_focus(True)
 
             self.row.add(btn)
