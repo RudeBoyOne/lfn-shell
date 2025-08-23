@@ -30,3 +30,29 @@
   color: #e0e0e0;
   font-size: 14px;
 }
+
+/* centralized classes for widgets */
+.clipboard-layer-root {
+  padding: 16px 16px;
+}
+
+.clipbar-row-padding {
+  padding: 12px 12px;
+}
+
+.clipbar-image-card {
+  padding: 10px;
+  border-radius: 10px;
+  background-color: rgba(0,0,0,0.02);
+}
+
+.clipbar-text-card {
+  padding: 12px;
+  border-radius: 10px;
+  background-color: rgba(0,0,0,0.02);
+}
+
+.clipbar-text-label {
+  font-size: 16px;
+  padding: 6px;
+}

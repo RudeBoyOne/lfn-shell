@@ -38,7 +38,7 @@ class ClipBar(Box):
             v_expand=True,
             h_align="fill",
             v_align="fill",
-            style="padding: 12px 12px;",  # mais espaçamento entre a borda do scroll e os cards
+            style_classes="clipbar-row-padding",
         )
 
         # ScrolledWindow com barras visíveis
@@ -126,7 +126,7 @@ class ClipBar(Box):
                     h_align="center",
                     v_align="center",
                     children=[Image(name="clipbar-thumb")],
-                    style="padding: 10px; border-radius: 10px; background-color: rgba(0,0,0,0.02);",
+                    style_classes="clipbar-image-card",
                 )
             else:
                 display = content.strip()
@@ -148,10 +148,10 @@ class ClipBar(Box):
                             wrap=True,  # permite múltiplas linhas
                             xalign=0.5,
                             yalign=0.5,
-                            style="font-size:14px; padding:4px;",
+                            style_classes="clipbar-text-label",
                         )
                     ],
-                    style="padding: 12px; border-radius: 10px; background-color: rgba(0,0,0,0.02);",
+                    style_classes="clipbar-text-card",
                 )
 
             btn = Button(

@@ -14,7 +14,7 @@ class ClipboardLayer(Window):
         bar = ClipBar(
             bar_height=197,
             item_width=320,
-            style="padding: 16px 16px;",
+            style_classes="clipboard-layer-root",
             controller=service,
         )
 
