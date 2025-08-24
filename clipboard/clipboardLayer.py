@@ -1,5 +1,9 @@
+import gi
+gi.require_version("GLib", "2.0")
+
 from gi.repository import GLib
-from fabric.widgets.wayland import WaylandWindow as Window
+from widgets.WindowWayland import WaylandWindow as Window
+# from fabric.widgets.wayland import WaylandWindow as Window
 
 from clipboard.clipboardBox import ClipBar
 from clipboard.clipboardService import ClipboardService
@@ -24,11 +28,10 @@ class ClipboardLayer(Window):
             anchor="left bottom right",
             layer="overlay",
             exclusive_zone=0,
-            keyboard_mode="exclusive",
+            keyboard_mode="on-demand",
             all_visible=True,
             child=bar,
         )
-
         self.child = bar
         self.service = service
 
