@@ -119,21 +119,6 @@ class ClipBar(Box):
     # não limpar listas para permitir reuso de widgets entre renders (previne perda de foco)
     # apenas garantimos que a row existe; botões serão escondidos quando necessário.
 
-        # Esconder todos os botões prontamente para evitar que widgets
-        # previamente populados continuem visíveis durante a atualização.
-        try:
-            for b in self._buttons:
-                try:
-                    b.hide()
-                except Exception:
-                    pass
-                try:
-                    setattr(b, "_mapped_index", None)
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
         # coleta itens do service e aplica filtro (case-insensitive)
         all_items = (self.controller.items if self.controller else [])
         if self._filter_text:
@@ -143,6 +128,17 @@ class ClipBar(Box):
 
         # aplicar limite de max_items
         render_candidates = filtered[: self.max_items]
+
+        # Limpar todos os filhos da row agora para garantir um estado
+        # consistente antes de re-adicionar botões/placeholder.
+        try:
+            for child in list(self.row.get_children()):
+                try:
+                    self.row.remove(child)
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
         # calcular altura desejada para os items de texto (wrap)
         # heurística: calcular número de linhas aproximado a partir do comprimento do texto
