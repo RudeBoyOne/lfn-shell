@@ -119,6 +119,21 @@ class ClipBar(Box):
     # não limpar listas para permitir reuso de widgets entre renders (previne perda de foco)
     # apenas garantimos que a row existe; botões serão escondidos quando necessário.
 
+        # Esconder todos os botões prontamente para evitar que widgets
+        # previamente populados continuem visíveis durante a atualização.
+        try:
+            for b in self._buttons:
+                try:
+                    b.hide()
+                except Exception:
+                    pass
+                try:
+                    setattr(b, "_mapped_index", None)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
         # coleta itens do service e aplica filtro (case-insensitive)
         all_items = (self.controller.items if self.controller else [])
         if self._filter_text:
@@ -171,11 +186,12 @@ class ClipBar(Box):
                         pass
             except Exception:
                 pass
+            # remover qualquer filho existente da row para garantir que
+            # apenas o placeholder esteja presente (evita widgets antigos)
             try:
                 for child in list(self.row.get_children()):
                     try:
-                        if getattr(child, "get_name", None) and child.get_name() == "clipbar-empty":
-                            self.row.remove(child)
+                        self.row.remove(child)
                     except Exception:
                         pass
             except Exception:
@@ -206,8 +222,18 @@ class ClipBar(Box):
                 empty_box.add(lbl)
             except Exception:
                 empty_box.children = [lbl]
+            # sempre adicionar o placeholder à row (com fallback) e mostrar
+            try:
                 self.row.add(empty_box)
+            except Exception:
+                try:
+                    self.row.pack_start(empty_box, True, True, 0)
+                except Exception:
+                    pass
+            try:
                 self.show_all()
+            except Exception:
+                pass
             return
         # reset mapping
         # Reuse existing buttons/widgets where possible to avoid focus loss.
