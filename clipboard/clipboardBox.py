@@ -77,9 +77,10 @@ class ClipBar(Box):
         except Exception:
             logger.debug("set_overlay_scrolling not supported", exc_info=True)
 
-        # campo de busca (centralizado, com debounce e foco ao abrir)
+        # campo de busca (centralizado). Atualiza dinamicamente conforme o usuário digita
         self.search_entry = Entry(placeholder="Buscar...", style_classes="clipbar-search", h_expand=True)
-        self.search_entry.connect("changed", lambda *_: self._schedule_search_update())
+        # conectar diretamente a atualização para resposta imediata durante digitação
+        self.search_entry.connect("changed", lambda *_: self._on_search_changed())
         # wrapper leve para centralizar horizontalmente sem alterar estilos globais
         search_wrap = Box(orientation="h", h_expand=True, h_align="center", children=[self.search_entry])
 
@@ -93,7 +94,6 @@ class ClipBar(Box):
         self._content_boxes = []
         self._rendered_orig_indices = []
         self._filter_text = ""
-        self._search_debounce_id = 0
 
         # integra com o Service
         self.controller = controller
@@ -113,11 +113,8 @@ class ClipBar(Box):
                 logger.debug("search_entry.grab_focus() failed", exc_info=True)
 
     def _render_items(self):
-        # preservar foco do campo de busca (se houver) antes de reconstruir
-        try:
-            self._search_was_focused = bool(getattr(self, "search_entry", None) and self.search_entry.has_focus())
-        except Exception:
-            self._search_was_focused = False
+    # Nota: não preservamos/restauramos foco durante render para evitar
+    # roubo de foco enquanto o usuário digita na caixa de busca.
 
     # não limpar listas para permitir reuso de widgets entre renders (previne perda de foco)
     # apenas garantimos que a row existe; botões serão escondidos quando necessário.
@@ -209,14 +206,8 @@ class ClipBar(Box):
                 empty_box.add(lbl)
             except Exception:
                 empty_box.children = [lbl]
-            self.row.add(empty_box)
-            self.show_all()
-            # restaurar foco no campo de busca se ele estava ativo antes da render
-            try:
-                if getattr(self, "_search_was_focused", False):
-                    GLib.idle_add(lambda: (self.search_entry.grab_focus(), False)[1])
-            except Exception:
-                pass
+                self.row.add(empty_box)
+                self.show_all()
             return
         # reset mapping
         # Reuse existing buttons/widgets where possible to avoid focus loss.
@@ -275,7 +266,7 @@ class ClipBar(Box):
                 display = (content or "").strip()
                 if len(display) > 600:
                     display = display[:597] + "..."
-                lbl = Label(name="clipbar-text", label=display, ellipsization="end", line_wrap=True, xalign=0.5, yalign=0.5)
+                lbl = Label(name="clipbar-text", label=display, ellipsization="end", wrap=True, xalign=0.5, yalign=0.5)
                 try:
                     content_box.add(lbl)
                 except Exception:
@@ -319,13 +310,7 @@ class ClipBar(Box):
         self.show_all()
         self._apply_selection_styles()
 
-        # restaurar foco no campo de busca se ele estava ativo antes da render
-        try:
-            if getattr(self, "_search_was_focused", False):
-                # agendar via idle para não interromper o fluxo de eventos atual
-                GLib.idle_add(lambda: (self.search_entry.grab_focus(), False)[1])
-        except Exception:
-            pass
+    # Não restauramos foco aqui para evitar roubo de foco durante digitação.
 
     def _apply_selection_styles(self):
         sel = self.controller.selected_index if self.controller else -1
@@ -476,37 +461,7 @@ class ClipBar(Box):
             self._render_items()
         except Exception:
             logger.exception("_render_items failed during search change")
-
-    def _schedule_search_update(self, debounce_ms: int = 450):
-        """Agenda um timeout debounced para aplicar o filtro da busca.
-
-        Se já houver um timeout agendado, cancela e re-agenda.
-        """
-        try:
-            # remove qualquer agendamento anterior
-            if getattr(self, "_search_debounce_id", 0):
-                try:
-                    GLib.source_remove(self._search_debounce_id)
-                except Exception:
-                    pass
-            # agenda novo timeout
-            self._search_debounce_id = GLib.timeout_add(int(debounce_ms), self._perform_debounced_search)
-        except Exception:
-            # fallback: chamada direta sem debounce
-            GLib.idle_add(self._on_search_changed)
-
-    def _perform_debounced_search(self):
-        """Executa a atualização de busca agendada. Retorna False para não repetir a timeout."""
-        try:
-            self._on_search_changed()
-        except Exception:
-            pass
-        # reset id e evitar re-execução
-        try:
-            self._search_debounce_id = 0
-        except Exception:
-            pass
-        return False
+    
 
     def _focus_search_entry(self):
         """Tenta focar o campo de busca; usado via GLib.idle_add após criação."""
@@ -514,18 +469,6 @@ class ClipBar(Box):
             if hasattr(self, "search_entry") and self.search_entry:
                 self.search_entry.grab_focus()
                 return False
-        except Exception:
-            pass
-        return False
-
-    def _restore_search_focus_if_needed(self):
-        """Restaura o foco no campo de busca se ele estava focado antes da render."""
-        try:
-            if getattr(self, "_search_was_focused", False) and hasattr(self, "search_entry") and self.search_entry:
-                try:
-                    self.search_entry.grab_focus()
-                except Exception:
-                    pass
         except Exception:
             pass
         return False
