@@ -10,14 +10,13 @@ from clipboard.clipboardLayer import ClipboardLayer
 
 if __name__ == "__main__":
     
-    # clipboard = ClipboardLayer();
-
     app = Application("lfn-shell")
 
     def set_css():
         app.set_stylesheet_from_file(
-            get_relative_path("styles/style.css"),
+            get_relative_path("main.css"),
         )
+        
     app.set_css = set_css
 
     app.set_css()

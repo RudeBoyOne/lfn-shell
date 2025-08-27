@@ -28,7 +28,7 @@ class ClipboardLayer(Window):
             anchor="left bottom right",
             layer="overlay",
             exclusive_zone=0,
-            keyboard_mode="on-demand",
+            keyboard_mode="exclusive",
             all_visible=True,
             child=bar,
         )

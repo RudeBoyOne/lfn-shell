@@ -275,7 +275,7 @@ class ClipBar(Box):
                 display = (content or "").strip()
                 if len(display) > 600:
                     display = display[:597] + "..."
-                lbl = Label(name="clipbar-text", label=display, ellipsization="end", wrap=True, xalign=0.5, yalign=0.5, style_classes="clipbar-text-label")
+                lbl = Label(name="clipbar-text", label=display, ellipsization="end", line_wrap=True, xalign=0.5, yalign=0.5)
                 try:
                     content_box.add(lbl)
                 except Exception:
