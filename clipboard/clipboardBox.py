@@ -326,14 +326,42 @@ class ClipBar(Box):
 
     def _apply_selection_styles(self):
         sel = self.controller.selected_index if self.controller else -1
-        for i, (btn, content) in enumerate(zip(self._buttons, self._content_boxes)):
+        selected_btn = None
+        for (btn, content) in zip(self._buttons, self._content_boxes):
             ctx = btn.get_style_context()
-            if i == sel:
+            mapped = getattr(btn, "_mapped_index", None)
+            if mapped == sel and sel is not None and sel >= 0:
                 ctx.add_class("suggested-action")
                 content.style = "padding: 8px; border-radius: 8px; background-color: rgba(255,255,255,0.12);"
+                selected_btn = btn
             else:
                 ctx.remove_class("suggested-action")
                 content.style = "padding: 8px; border-radius: 8px;"
+
+        # role the scroll view to show the selected mapped item (if any)
+        try:
+            if selected_btn is not None:
+                hadj = self.scroll.get_hadjustment()
+                alloc = selected_btn.get_allocation()
+                view_x = hadj.get_value()
+                view_w = int(hadj.get_page_size())
+                item_x = alloc.x
+                item_w = alloc.width
+                # if item is left of view or right of view, adjust
+                if item_x < view_x:
+                    hadj.set_value(max(0, item_x))
+                elif item_x + item_w > view_x + view_w:
+                    hadj.set_value(min(hadj.get_upper() - view_w, item_x + item_w - view_w))
+                # ensure focus on the selected button unless the search box has focus
+                try:
+                    if getattr(self, "search_entry", None) and self.search_entry.has_focus():
+                        pass
+                    else:
+                        selected_btn.grab_focus()
+                except Exception:
+                    pass
+        except Exception:
+            pass
         # rola a scroll view para mostrar o item selecionado (se houver)
         try:
             if 0 <= sel < len(self._buttons):
