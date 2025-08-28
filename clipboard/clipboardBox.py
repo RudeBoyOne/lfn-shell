@@ -1,20 +1,10 @@
-from typing import Optional, List, Tuple
+from typing import Optional
 import re
 import sys
 import logging
 
 import gi
 logger = logging.getLogger(__name__)
-try:
-    gi.require_version("GdkPixbuf", "2.0")
-except Exception:
-    # pode falhar em ambientes sem GdkPixbuf; registrar em debug para diagnóstico
-    logger.debug("gi.require_version GdkPixbuf failed", exc_info=True)
-try:
-    gi.require_version("Gtk", "3.0")
-except Exception:
-    # if Gtk already loaded (e.g. Gtk 4), allow fallback; registrar em debug
-    logger.debug("gi.require_version Gtk failed (fallback possible)", exc_info=True)
 from gi.repository import GdkPixbuf, GLib, Gtk
 from fabric.widgets.box import Box
 from fabric.widgets.button import Button

@@ -1,5 +1,4 @@
 import os
-# os.environ["GDK_BACKEND"] = "wayland"
 
 from gi.repository import GLib
 from fabric import Application
