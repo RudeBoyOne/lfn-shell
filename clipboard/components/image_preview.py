@@ -6,13 +6,18 @@ from gi.repository import GdkPixbuf
 def is_image_data(content: str) -> bool:
     if not content:
         return False
+    text = content.strip()
+    low = text.lower()
+    short_labels = {"[image]", "[imagem]", "[img]", "[imagem]"}
+    if low in short_labels:
+        return True
     return (
         content.startswith("data:image/")
         or content.startswith("\x89PNG")
         or content.startswith("GIF8")
         or content.startswith("\xff\xd8\xff")
         or re.match(r"^\s*<img\s+", content) is not None
-        or ("binary" in content.lower() and any(ext in content.lower() for ext in ["jpg", "jpeg", "png", "bmp", "gif"]))
+        or ("binary" in low and any(ext in low for ext in ["jpg", "jpeg", "png", "bmp", "gif"]))
     )
 
 

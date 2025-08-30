@@ -1,6 +1,7 @@
 from typing import Optional
 
 import gi
+import threading
 from gi.repository import GLib, Gtk
 
 from fabric.widgets.box import Box
@@ -96,29 +97,41 @@ class ClipBar(Box):
             for ch in list(content_box.get_children()):
                 content_box.remove(ch)
 
+            def apply_pixbuf_to_button(b, pix):
+                box = b.get_child()
+                if not box:
+                    return False
+                children = list(box.get_children())
+                if children and isinstance(children[0], Image):
+                    children[0].set_from_pixbuf(pix)
+                else:
+                    for c in children:
+                        box.remove(c)
+                    new_img = Image(name="clipbar-thumb")
+                    box.add(new_img)
+                    new_img.set_from_pixbuf(pix)
+                return False
+
+            def load_and_apply(it_id, b=btn):
+                raw = b""
+                if self.controller and hasattr(self.controller, "decode_item"):
+                    raw = self.controller.decode_item(it_id)
+                pix = decode_and_scale(raw or b"", self.item_width, self.item_height)
+                if not pix:
+                    return
+                GLib.idle_add(lambda p=pix, bb=b: apply_pixbuf_to_button(bb, p))
+
             if is_img:
                 img = Image(name="clipbar-thumb")
                 content_box.add(img)
-
-                def _run_load(it_id, b=btn):
-                    raw = self.controller.decode_item(it_id) if (self.controller and hasattr(self.controller, "decode_item")) else b""
-                    pix = decode_and_scale(raw or b"", self.item_width, self.item_height)
-                    if not pix:
-                        return False
-                    box = b.get_child()
-                    if box and box.get_children():
-                        img_w = box.get_children()[0]
-                        if isinstance(img_w, Image):
-                            img_w.set_from_pixbuf(pix)
-                    return False
-
-                GLib.idle_add(lambda it=item_id: _run_load(it))
+                threading.Thread(target=load_and_apply, args=(item_id,), daemon=True).start()
             else:
                 display = (content or "").strip()
                 if len(display) > 600:
                     display = display[:597] + "..."
                 lbl = Label(name="clipbar-text", label=display, ellipsization="end", wrap=True, xalign=0.5, yalign=0.5)
                 content_box.add(lbl)
+                threading.Thread(target=load_and_apply, args=(item_id,), daemon=True).start()
 
             if btn.get_parent() is None:
                 self.row.add(btn)
