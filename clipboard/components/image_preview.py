@@ -17,11 +17,16 @@ def is_image_data(content: str) -> bool:
         or content.startswith("GIF8")
         or content.startswith("\xff\xd8\xff")
         or re.match(r"^\s*<img\s+", content) is not None
-        or ("binary" in low and any(ext in low for ext in ["jpg", "jpeg", "png", "bmp", "gif"]))
+        or (
+            "binary" in low
+            and any(ext in low for ext in ["jpg", "jpeg", "png", "bmp", "gif"])
+        )
     )
 
 
-def decode_and_scale(raw: bytes, item_width: int, item_height: int, padding: int = 16) -> Optional[GdkPixbuf.Pixbuf]:
+def decode_and_scale(
+    raw: bytes, item_width: int, item_height: int, padding: int = 16
+) -> Optional[GdkPixbuf.Pixbuf]:
     """Decode raw bytes into a scaled GdkPixbuf.Pixbuf or None on failure."""
     if not raw:
         return None

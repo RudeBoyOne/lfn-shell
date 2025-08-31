@@ -18,22 +18,64 @@ from clipboard.components.render_utils import compute_computed_item_height
 
 
 class ClipBar(Box):
-    def __init__(self, max_items=50, bar_height=56, item_width=260, controller: Optional[ClipboardService] = None, item_height: Optional[int] = None, **kwargs):
-        super().__init__(name="clipbar-root", spacing=6, orientation="v", h_expand=True, v_expand=True, **kwargs)
+    def __init__(
+        self,
+        max_items=50,
+        bar_height=56,
+        item_width=260,
+        controller: Optional[ClipboardService] = None,
+        item_height: Optional[int] = None,
+        **kwargs
+    ):
+        super().__init__(
+            name="clipbar-root",
+            spacing=6,
+            orientation="v",
+            h_expand=True,
+            v_expand=True,
+            **kwargs
+        )
 
         self.bar_height = bar_height
         self.item_width = item_width
         self.item_height = item_height or max(56, self.bar_height - 4)
         self.max_items = max_items
 
-        self.row = Box(name="clipbar-row", orientation="h", spacing=16, h_expand=False, v_expand=True, h_align="fill", v_align="fill", style_classes="clipbar-row-padding")
-        self.scroll = ScrolledWindow(name="clipbar-scroll", child=self.row, h_expand=True, v_expand=True, h_align="fill", v_align="fill", propagate_width=False, propagate_height=False)
+        self.row = Box(
+            name="clipbar-row",
+            orientation="h",
+            spacing=16,
+            h_expand=False,
+            v_expand=True,
+            h_align="fill",
+            v_align="fill",
+            style_classes="clipbar-row-padding",
+        )
+        self.scroll = ScrolledWindow(
+            name="clipbar-scroll",
+            child=self.row,
+            h_expand=True,
+            v_expand=True,
+            h_align="fill",
+            v_align="fill",
+            propagate_width=False,
+            propagate_height=False,
+        )
         self.scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
 
-        self.search_entry = Entry(placeholder="Buscar...", style_classes="clipbar-search", h_expand=True)
+        self.search_entry = Entry(
+            placeholder="Buscar...", style_classes="clipbar-search", h_expand=True
+        )
         self.search_entry.connect("changed", lambda *_: self._on_search_changed())
 
-        self.add(Box(orientation="h", h_expand=True, h_align="center", children=[self.search_entry]))
+        self.add(
+            Box(
+                orientation="h",
+                h_expand=True,
+                h_align="center",
+                children=[self.search_entry],
+            )
+        )
         self.add(self.scroll)
         self.set_size_request(-1, self.bar_height)
 
@@ -45,17 +87,23 @@ class ClipBar(Box):
         self.controller = controller
         if self.controller:
             self.controller.connect("notify::items", lambda *_: self._render_items())
-            self.controller.connect("notify::selected-index", lambda *_: GLib.idle_add(self._on_selected_index_changed))
+            self.controller.connect(
+                "notify::selected-index",
+                lambda *_: GLib.idle_add(self._on_selected_index_changed),
+            )
 
         self._render_items()
-        # Ensure selection classes are applied after first render (avoid race)
         GLib.idle_add(self._sync_button_selection_classes)
         GLib.idle_add(self._focus_search_entry)
 
     def _render_items(self):
         all_items = self.controller.items if self.controller else []
         if self._filter_text:
-            filtered = [(i, itm_id, txt) for i, (itm_id, txt) in enumerate(all_items) if self._filter_text in (txt or "").lower()]
+            filtered = [
+                (i, itm_id, txt)
+                for i, (itm_id, txt) in enumerate(all_items)
+                if self._filter_text in (txt or "").lower()
+            ]
         else:
             filtered = [(i, itm_id, txt) for i, (itm_id, txt) in enumerate(all_items)]
 
@@ -64,15 +112,31 @@ class ClipBar(Box):
         for child in list(self.row.get_children()):
             self.row.remove(child)
 
-        computed_item_height = compute_computed_item_height(render_candidates, self.item_width, self.item_height)
+        computed_item_height = compute_computed_item_height(
+            render_candidates, self.item_width, self.item_height
+        )
         self.set_size_request(-1, max(self.bar_height, computed_item_height + 16))
 
         if not render_candidates:
             for btn in self._buttons:
-                btn.hide(); setattr(btn, "_mapped_index", None); btn.get_style_context().remove_class("suggested-action")
-            empty_box = Box(orientation="v", h_expand=True, v_expand=True, h_align="center", v_align="center")
+                btn.hide()
+                setattr(btn, "_mapped_index", None)
+                btn.get_style_context().remove_class("suggested-action")
+            empty_box = Box(
+                orientation="v",
+                h_expand=True,
+                v_expand=True,
+                h_align="center",
+                v_align="center",
+            )
             empty_box.set_size_request(self.item_width, computed_item_height)
-            lbl = Label(name="clipbar-empty", label="(Clipboard vazio)" if not all_items else "(nenhum resultado)", xalign=0.5, yalign=0.5, style_classes="clipbar-empty-label")
+            lbl = Label(
+                name="clipbar-empty",
+                label="(Clipboard vazio)" if not all_items else "(nenhum resultado)",
+                xalign=0.5,
+                yalign=0.5,
+                style_classes="clipbar-empty-label",
+            )
             empty_box.add(lbl)
             self.row.add(empty_box)
             self.show_all()
@@ -81,8 +145,21 @@ class ClipBar(Box):
         self._rendered_orig_indices = []
         needed = len(render_candidates)
         while len(self._buttons) < needed:
-            placeholder_box = Box(orientation="v", spacing=6, h_expand=True, v_expand=True, h_align="center", v_align="center")
-            new_btn = Button(name="clipbar-item", child=placeholder_box, v_expand=False, v_align="center", style_classes="clipbar-item")
+            placeholder_box = Box(
+                orientation="v",
+                spacing=6,
+                h_expand=True,
+                v_expand=True,
+                h_align="center",
+                v_align="center",
+            )
+            new_btn = Button(
+                name="clipbar-item",
+                child=placeholder_box,
+                v_expand=False,
+                v_align="center",
+                style_classes="clipbar-item",
+            )
             new_btn.set_can_focus(True)
             new_btn.connect("clicked", lambda _btn, *_: self._on_button_clicked(_btn))
             setattr(new_btn, "_mapped_index", None)
@@ -124,14 +201,25 @@ class ClipBar(Box):
             if is_img:
                 img = Image(name="clipbar-thumb")
                 content_box.add(img)
-                threading.Thread(target=load_and_apply, args=(item_id,), daemon=True).start()
+                threading.Thread(
+                    target=load_and_apply, args=(item_id,), daemon=True
+                ).start()
             else:
                 display = (content or "").strip()
                 if len(display) > 600:
                     display = display[:597] + "..."
-                lbl = Label(name="clipbar-text", label=display, ellipsization="end", wrap=True, xalign=0.5, yalign=0.5)
+                lbl = Label(
+                    name="clipbar-text",
+                    label=display,
+                    ellipsization="end",
+                    wrap=True,
+                    xalign=0.5,
+                    yalign=0.5,
+                )
                 content_box.add(lbl)
-                threading.Thread(target=load_and_apply, args=(item_id,), daemon=True).start()
+                threading.Thread(
+                    target=load_and_apply, args=(item_id,), daemon=True
+                ).start()
 
             if btn.get_parent() is None:
                 self.row.add(btn)
@@ -143,16 +231,15 @@ class ClipBar(Box):
             self._rendered_orig_indices.append(orig_idx)
 
         for j in range(len(render_candidates), len(self._buttons)):
-            self._buttons[j].hide(); setattr(self._buttons[j], "_mapped_index", None); self._buttons[j].get_style_context().remove_class("suggested-action")
+            self._buttons[j].hide()
+            setattr(self._buttons[j], "_mapped_index", None)
+            self._buttons[j].get_style_context().remove_class("suggested-action")
 
         self.show_all()
-        # schedule class/visibility sync after layout to avoid transient double-styling
         GLib.idle_add(self._sync_button_selection_classes)
         GLib.idle_add(self._ensure_selection_visible)
 
     def _sync_button_selection_classes(self):
-        # controller.selected_index is an index into the full items list.
-        # Buttons map to original indices via _mapped_index; find the matching button.
         sel = self.controller.selected_index if self.controller else -1
         target = None
         for b in list(self._buttons):
@@ -169,7 +256,6 @@ class ClipBar(Box):
 
     def _ensure_selection_visible(self):
         sel = self.controller.selected_index if self.controller else -1
-        # find the button that maps to the selected original index
         btn = None
         for b in self._buttons:
             if getattr(b, "_mapped_index", None) == sel:
@@ -179,8 +265,10 @@ class ClipBar(Box):
             return
         hadj = self.scroll.get_hadjustment()
         alloc = btn.get_allocation()
-        view_x = hadj.get_value(); view_w = int(hadj.get_page_size())
-        item_x = alloc.x; item_w = alloc.width
+        view_x = hadj.get_value()
+        view_w = int(hadj.get_page_size())
+        item_x = alloc.x
+        item_w = alloc.width
         if item_x < view_x:
             hadj.set_value(max(0, item_x))
         elif item_x + item_w > view_x + view_w:
@@ -194,8 +282,10 @@ class ClipBar(Box):
             btn = self._buttons[sel]
             hadj = self.scroll.get_hadjustment()
             alloc = btn.get_allocation()
-            view_x = hadj.get_value(); view_w = int(hadj.get_page_size())
-            item_x = alloc.x; item_w = alloc.width
+            view_x = hadj.get_value()
+            view_w = int(hadj.get_page_size())
+            item_x = alloc.x
+            item_w = alloc.width
             if item_x < view_x:
                 hadj.set_value(max(0, item_x))
             elif item_x + item_w > view_x + view_w:
@@ -215,6 +305,6 @@ class ClipBar(Box):
 
     def _focus_search_entry(self):
         if getattr(self, "search_entry", None):
-            self.search_entry.grab_focus(); return False
+            self.search_entry.grab_focus()
+            return False
         return False
-

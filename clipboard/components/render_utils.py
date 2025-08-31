@@ -1,7 +1,11 @@
 from typing import List, Tuple
 
 
-def compute_computed_item_height(render_candidates: List[Tuple[int, str, str]], item_width: int, base_item_height: int) -> int:
+def compute_computed_item_height(
+    render_candidates: List[Tuple[int, str, str]],
+    item_width: int,
+    base_item_height: int,
+) -> int:
     """Compute a suggested item height based on text lengths and image presence.
 
     render_candidates: list of (orig_idx, item_id, content)
@@ -13,7 +17,6 @@ def compute_computed_item_height(render_candidates: List[Tuple[int, str, str]], 
         for _, _, content in render_candidates:
             if not content:
                 continue
-            # heuristic: treat non-image content as text
             display_len = len((content or "").strip())
             lines = min(6, max(1, (display_len // chars_per_line) + 1))
             if lines > max_text_lines:

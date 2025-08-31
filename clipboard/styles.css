@@ -1,51 +1,43 @@
 * {
-  all: unset;
+    all: unset;
 }
 
 #clipbar-root {
-  background-color: transparent;
-  padding: 8px;
+    background-color: transparent;
+    padding: 8px;
 }
 
 #clipbar-item {
-  background-color: var(--background-blur-no-active);
-  border-radius: 5px;
-  padding: 8px;
+    background-color: var(--background-blur-no-active);
+    border-radius: 5px;
+    padding: 8px;
 }
 
 #clipbar-item.suggested-action {
-  /* background-color: @inverse_on_surface; */
-  background-color: var(--background-blur-active);
-  border: 2px solid var(--primary);
+    /* background-color: @inverse_on_surface; */
+    background-color: var(--background-blur-active);
+    border: 2px solid var(--primary);
 }
 
 #clipbar-thumb {
-  /* imagem centralizada: o widget Image deve ser alinhado via h_align/v_align
+    /* imagem centralizada: o widget Image deve ser alinhado via h_align/v_align
      O CSS aqui pode controlar borda/outline, não o dimensionamento do Pixbuf. */
-  margin: 0; 
+    margin: 0;
 }
 
 #clipbar-text {
-  color: #e0e0e0;
-  font-size: 14px;
-  font-weight: bold;
+    color: #e0e0e0;
+    font-size: 14px;
+    font-weight: bold;
 }
 
 .clipbar-row-padding {
-  padding: 5px 5px;
+    padding: 5px 5px;
 }
 
 .clipbar-search {
-  background-color: var(--background-blur-no-active);
-  border: 2px solid var(--primary);
-  padding: 6px;
-  border-radius: 5px;
-}
-
-/* Visual para o content box quando item está selecionado.
-   Substitui estilos inline removidos do ClipBar. */
-.clipbar-item-selected {
-  padding: 8px;
-  border-radius: 8px;
-  background-color: rgba(255,255,255,0.12);
+    background-color: var(--background-blur-no-active);
+    border: 2px solid var(--primary);
+    padding: 6px;
+    border-radius: 5px;
 }
