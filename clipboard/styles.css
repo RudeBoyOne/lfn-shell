@@ -14,14 +14,11 @@
 }
 
 #clipbar-item.suggested-action {
-    /* background-color: @inverse_on_surface; */
     background-color: var(--background-blur-active);
     border: 2px solid var(--primary);
 }
 
 #clipbar-thumb {
-    /* imagem centralizada: o widget Image deve ser alinhado via h_align/v_align
-     O CSS aqui pode controlar borda/outline, não o dimensionamento do Pixbuf. */
     margin: 0;
 }
 

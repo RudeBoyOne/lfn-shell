@@ -5,6 +5,7 @@ from fabric import Application
 from fabric.utils import get_relative_path
 
 from clipboard.clipboardLayer import ClipboardLayer
+from power_menu.powerLayer import PowerLayer
 
 
 if __name__ == "__main__":
