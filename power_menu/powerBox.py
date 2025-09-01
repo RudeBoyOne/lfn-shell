@@ -20,7 +20,7 @@ class PowerMenu(Box):
     def __init__(self, controller: PowerService, orientation: str = "v", **kwargs):
         super().__init__(
             name="power-menu",
-            orientation=orientation,  # vertical por padrão para lista lateral
+            orientation=orientation,
             spacing=6,
             v_align="center",
             h_align="center",

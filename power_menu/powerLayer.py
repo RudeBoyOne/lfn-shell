@@ -8,7 +8,6 @@ class PowerLayer(Window):
         service = PowerService()
         menu = PowerMenu(controller=service)
 
-        # Anchor somente à esquerda para centralizar verticalmente (sem top/bottom)
         super().__init__(
             name="power-menu-layer",
             type="top-level",
@@ -18,7 +17,7 @@ class PowerLayer(Window):
             keyboard_mode="exclusive",
             all_visible=True,
             child=menu,
-            margin="0px 0px 0px 24px",  # margem da borda esquerda
+            margin="0px 0px 0px 5px",
         )
         self.service = service
         self.child = menu

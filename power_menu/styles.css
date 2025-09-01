@@ -1,55 +1,35 @@
-/* Reset local (não afeta global se importado depois) */
 * {
   all: unset;
 }
 
-/* Layer transparente total (a janela) - aplicado via name da window se desejar */
-#power-menu-layer {
-  background-color: transparent;
-}
-
-
-/* Box principal que envolve os botões */
 #power-menu {
-  background-color: rgba(17, 19, 24, 0.35); /* levemente mais escuro que layer transparente */
+  background-color: var(--background-blur-no-active);
   padding: 12px;
   border-radius: 10px;
-  /* Layout vertical já é provido pelo Box (orientation="v" + spacing) */
 }
 
-/* Botões (ícones) */
 #power-menu-button {
-  background-color: rgba(17, 19, 24, 0.25);
+  background-color: var(--background-blur-no-active);
   border-radius: 8px;
   padding: 10px;
-  border: 2px solid transparent; /* permite mostrar foco sem deslocar layout */
-  /* Tamanho padrão (quadrado) para todos os botões */
-  min-width: 68px;  /* largura mínima consistente */
-  min-height: 68px; /* altura mínima consistente */
+  border: 2px solid transparent;
+  min-width: 68px;
+  min-height: 68px;
 }
 
 #power-menu-button:hover {
-  background-color: rgba(17, 19, 24, 0.45);
+  background-color: var(--background-blur-active);
 }
 
-/* Estado focado/selecionado (2px de borda) */
 #power-menu-button:focus, #power-menu-button:focus-within, #power-menu-button.suggested-action {
   border-color: var(--primary);
-  background-color: rgba(17, 19, 24, 0.50);
+  background-color: var(--background-blur-active);
 }
 
-/* Ícone (Label interno) tamanho médio */
 #power-menu-button > #button-label {
-  font-size: 36px; /* tamanho médio uniforme */
-  min-width: 40px; /* garante área horizontal p/ centralização visual */
+  font-size: 46px;
+  min-width: 40px;
   min-height: 40px;
   color: var(--foreground);
   text-shadow: 0 1px 2px rgba(0,0,0,0.6);
 }
-
-/* Feedback ao pressionar */
-#power-menu-button:active {
-  background-color: rgba(17, 19, 24, 0.65);
-}
-
-/* (Animações removidas: GTK3 não suporta @keyframes / animation) */

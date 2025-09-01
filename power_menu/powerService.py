@@ -47,7 +47,7 @@ class PowerService(Service):
 
     # ações públicas
     def lock_session(self):
-        self._run("lock", "loginctl lock-session")
+        self._run("lock", "hyprlock")
 
     def logout_session(self):
         # Ajuste comando conforme compositor/WM; Hyprland usa hyprctl dispatch exit
