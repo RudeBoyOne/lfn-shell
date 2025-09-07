@@ -14,7 +14,6 @@ from fabric.widgets.scrolledwindow import ScrolledWindow
 from clipboard.clipboardService import ClipboardService
 from clipboard.components.image_preview import is_image_data, decode_and_scale
 from clipboard.components.search import highlight_markup_multi
-# altura por item será medida dinamicamente; não usamos mais heurística global
 
 
 class ClipBar(Box):
@@ -149,7 +148,6 @@ class ClipBar(Box):
         self._rendered_orig_indices = []
         needed = len(render_candidates)
         while len(self._buttons) < needed:
-            # card container baseado em EventBox para suportar texto multi-linha e clique
             content_box = Box(
                 orientation="v",
                 spacing=6,
