@@ -1,6 +1,7 @@
 import subprocess
 from typing import List, Tuple
 import logging
+from gi.repository import GLib
 
 from fabric.core.service import Service, Signal, Property
 from fabric import Fabricator
@@ -36,9 +37,14 @@ class ClipboardService(Service):
 
     def __init__(self, interval_ms: int = 1500, **kwargs):
         super().__init__(**kwargs)
-        self._items: List[Tuple[str, str]] = []
-        self._selected_index: int = -1
-        self._last_raw: str = ""
+        self._items = []  # List[Tuple[str, str]]
+        self._selected_index = -1
+        self._last_raw = ""
+        # busca (debounced)
+        self._query = ""
+        self._query_pending = ""
+        self._query_timer_id = None
+        self._query_debounce_ms = 250
 
         # Fabricator: atualiza itens periodicamente
         # Use função Python (sem shell) e normalize o texto
@@ -61,6 +67,45 @@ class ClipboardService(Service):
             poll_from=poll_history,
             on_changed=lambda f, v: self._on_history_changed(v),
         )
+
+    # Propriedade pública: query (valor já debounced)
+    @Property(str, flags="read-write")
+    def query(self) -> str:
+        return self._query
+
+    @query.setter
+    def query(self, value: str):
+        norm = (value or "").lower()
+        if norm == getattr(self, "_query", ""):
+            return
+        self._query = norm
+
+    # Entrada imediata de texto (debounce para publicar em `query`)
+    def update_query_input(self, text: str):
+        pending = (text or "").lower()
+        # Se não mudou e já existe timer ativo, não faz nada
+        if (
+            pending == getattr(self, "_query_pending", "")
+            and self._query_timer_id is not None
+        ):
+            return
+        self._query_pending = pending
+        # reinicia timer
+        if self._query_timer_id is not None:
+            try:
+                GLib.source_remove(self._query_timer_id)
+            except Exception:
+                pass
+            self._query_timer_id = None
+
+        def _apply():
+            # publica somente se mudou de fato
+            self._query_timer_id = None
+            if self._query != self._query_pending:
+                self.query = self._query_pending
+            return False
+
+        self._query_timer_id = GLib.timeout_add(self._query_debounce_ms, _apply)
 
     # chamado pelo Fabricator
     def _on_history_changed(self, raw: str):

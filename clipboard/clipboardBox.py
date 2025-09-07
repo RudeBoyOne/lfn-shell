@@ -13,7 +13,7 @@ from fabric.widgets.scrolledwindow import ScrolledWindow
 
 from clipboard.clipboardService import ClipboardService
 from clipboard.components.image_preview import is_image_data, decode_and_scale
-from clipboard.components.search import handle_search_change
+from clipboard.components.search import highlight_markup_multi
 from clipboard.components.render_utils import compute_computed_item_height
 
 
@@ -91,6 +91,7 @@ class ClipBar(Box):
                 "notify::selected-index",
                 lambda *_: GLib.idle_add(self._on_selected_index_changed),
             )
+            self.controller.connect("notify::query", lambda *_: self._on_query_changed())
 
         self._render_items()
         GLib.idle_add(self._sync_button_selection_classes)
@@ -98,11 +99,15 @@ class ClipBar(Box):
 
     def _render_items(self):
         all_items = self.controller.items if self.controller else []
-        if self._filter_text:
+        # pega filtro atual do service (normalizado)
+        self._filter_text = (self.controller.query or "") if self.controller else ""
+        terms = [t for t in (self._filter_text.split() if self._filter_text else []) if t]
+        if terms:
+            # AND: todos os termos devem existir no texto
             filtered = [
                 (i, itm_id, txt)
                 for i, (itm_id, txt) in enumerate(all_items)
-                if self._filter_text in (txt or "").lower()
+                if all(t in (txt or "").lower() for t in terms)
             ]
         else:
             filtered = [(i, itm_id, txt) for i, (itm_id, txt) in enumerate(all_items)]
@@ -208,18 +213,17 @@ class ClipBar(Box):
                 display = (content or "").strip()
                 if len(display) > 600:
                     display = display[:597] + "..."
+                # aplica destaque via pango markup multi-termo
+                markup = highlight_markup_multi(display, terms)
                 lbl = Label(
                     name="clipbar-text",
-                    label=display,
+                    markup=markup,
                     ellipsization="end",
                     wrap=True,
                     xalign=0.5,
                     yalign=0.5,
                 )
                 content_box.add(lbl)
-                threading.Thread(
-                    target=load_and_apply, args=(item_id,), daemon=True
-                ).start()
 
             if btn.get_parent() is None:
                 self.row.add(btn)
@@ -235,9 +239,53 @@ class ClipBar(Box):
             setattr(self._buttons[j], "_mapped_index", None)
             self._buttons[j].get_style_context().remove_class("suggested-action")
 
+        # Se há filtro ativo e o item selecionado não está visível,
+        # move a seleção para o primeiro resultado
+        if terms and self.controller:
+            sel = self.controller.selected_index
+            if sel not in self._rendered_orig_indices and self._rendered_orig_indices:
+                self.controller.selected_index = self._rendered_orig_indices[0]
+
         self.show_all()
         GLib.idle_add(self._sync_button_selection_classes)
         GLib.idle_add(self._ensure_selection_visible)
+
+    def _move_within_filtered(self, delta: int):
+        if not self.controller:
+            return
+        sel = self.controller.selected_index
+        if sel < 0 or not self._rendered_orig_indices:
+            return
+        # posição do índice selecionado dentro dos renderizados
+        try:
+            pos = self._rendered_orig_indices.index(sel)
+        except ValueError:
+            # se o selecionado não está visível, vai para o começo/fim
+            pos = 0 if delta > 0 else len(self._rendered_orig_indices) - 1
+        new_pos = max(0, min(pos + delta, len(self._rendered_orig_indices) - 1))
+        new_orig_idx = self._rendered_orig_indices[new_pos]
+        if new_orig_idx != sel:
+            self.controller.selected_index = new_orig_idx
+            self._sync_button_selection_classes()
+            self._ensure_selection_visible()
+
+    # Navegação pública usada pelo Layer
+    def navigate(self, delta: int):
+        # Se há filtro e mapeamento, navega dentro do subconjunto
+        if (self.controller and (self.controller.query or "").strip()) and self._rendered_orig_indices:
+            self._move_within_filtered(delta)
+        else:
+            # delega ao Service
+            if delta < 0:
+                self.controller.move_left()
+            else:
+                self.controller.move_right()
+        # Só força foco no item se o entry não estiver com foco
+        try:
+            if not (getattr(self, "search_entry", None) and self.search_entry.has_focus()):
+                self.focus_selected()
+        except Exception:
+            pass
 
     def _sync_button_selection_classes(self):
         sel = self.controller.selected_index if self.controller else -1
@@ -263,7 +311,9 @@ class ClipBar(Box):
                 break
         if btn is None:
             return
-        hadj = self.scroll.get_hadjustment()
+        hadj = self.scroll.get_hadjustment() if self.scroll else None
+        if hadj is None:
+            return
         alloc = btn.get_allocation()
         view_x = hadj.get_value()
         view_w = int(hadj.get_page_size())
@@ -280,7 +330,9 @@ class ClipBar(Box):
         sel = self.controller.selected_index if self.controller else -1
         if 0 <= sel < len(self._buttons):
             btn = self._buttons[sel]
-            hadj = self.scroll.get_hadjustment()
+            hadj = self.scroll.get_hadjustment() if self.scroll else None
+            if hadj is None:
+                return
             alloc = btn.get_allocation()
             view_x = hadj.get_value()
             view_w = int(hadj.get_page_size())
@@ -300,11 +352,31 @@ class ClipBar(Box):
             self.controller.activate_index(idx)
 
     def _on_search_changed(self, *args):
-        self._filter_text = handle_search_change(lambda: self.search_entry.get_text())
+        # envia texto para o Service (debounced)
+        if self.controller and hasattr(self.controller, "update_query_input"):
+            try:
+                self.controller.update_query_input(self.search_entry.get_text())
+            except Exception:
+                pass
+
+    def _on_query_changed(self):
+        # sincroniza Entry e re-renderiza com base no service.query
+        if getattr(self, "search_entry", None) and self.controller:
+            q = self.controller.query or ""
+            try:
+                if self.search_entry.get_text() != q:
+                    self.search_entry.set_text(q)
+            except Exception:
+                pass
         self._render_items()
 
     def _focus_search_entry(self):
         if getattr(self, "search_entry", None):
-            self.search_entry.grab_focus()
+            try:
+                self.search_entry.grab_focus()
+                # manter cursor ao final para não perder foco em edições/backsapce
+                self.search_entry.set_position(-1)
+            except Exception:
+                pass
             return False
         return False

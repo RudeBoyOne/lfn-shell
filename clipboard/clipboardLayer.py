@@ -39,16 +39,15 @@ class ClipboardLayer(Window):
         # helper para mover e agendar foco, reduz duplicação
         def move_and_focus(delta: int):
             try:
-                if delta < 0:
-                    self.service.move_left()
+                if hasattr(self, "child") and hasattr(self.child, "navigate"):
+                    self.child.navigate(delta)
                 else:
-                    self.service.move_right()
+                    if delta < 0:
+                        self.service.move_left()
+                    else:
+                        self.service.move_right()
             finally:
-                try:
-                    if hasattr(self, "child") and hasattr(self.child, "focus_selected"):
-                        GLib.idle_add(self.child.focus_selected)
-                except Exception:
-                    pass
+                pass
 
         def _left(*_):
             move_and_focus(-1)
