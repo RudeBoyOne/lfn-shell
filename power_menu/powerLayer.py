@@ -17,7 +17,7 @@ class PowerLayer(Window):
             keyboard_mode="exclusive",
             all_visible=True,
             child=menu,
-            margin="0px 0px 0px 5px",
+            margin="0px 0px 0px 5px"
         )
         self.service = service
         self.child = menu

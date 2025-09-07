@@ -1,4 +1,4 @@
 lock: str = "  "
 logout: str = "  "
-reboot: str = "  "
+reboot: str = "  "
 shutdown: str = " ⏻ "

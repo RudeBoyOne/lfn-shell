@@ -21,7 +21,7 @@ class PowerMenu(Box):
         super().__init__(
             name="power-menu",
             orientation=orientation,
-            spacing=6,
+            spacing=17,
             v_align="center",
             h_align="center",
             visible=True,
