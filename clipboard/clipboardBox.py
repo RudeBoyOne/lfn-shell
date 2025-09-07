@@ -150,26 +150,28 @@ class ClipBar(Box):
         self._rendered_orig_indices = []
         needed = len(render_candidates)
         while len(self._buttons) < needed:
-            placeholder_box = Box(
+            # card container baseado em EventBox para suportar texto multi-linha e clique
+            content_box = Box(
                 orientation="v",
                 spacing=6,
-                h_expand=True,
+                h_expand=False,
                 v_expand=True,
-                h_align="center",
+                h_align="fill",
                 v_align="center",
             )
-            new_btn = Button(
+            content_box.set_size_request(max(1, self.item_width - 8), -1)
+            card = Button(
                 name="clipbar-item",
-                child=placeholder_box,
+                child=content_box,
                 v_expand=False,
                 v_align="center",
                 style_classes="clipbar-item",
             )
-            new_btn.set_can_focus(True)
-            new_btn.connect("clicked", lambda _btn, *_: self._on_button_clicked(_btn))
-            setattr(new_btn, "_mapped_index", None)
-            self._buttons.append(new_btn)
-            self._content_boxes.append(placeholder_box)
+            card.set_can_focus(True)
+            card.connect("clicked", lambda _btn, *_: self._on_button_clicked(_btn))
+            setattr(card, "_mapped_index", None)
+            self._buttons.append(card)
+            self._content_boxes.append(content_box)
 
         for idx, (orig_idx, item_id, content) in enumerate(render_candidates):
             is_img = is_image_data(content)
@@ -179,8 +181,7 @@ class ClipBar(Box):
             for ch in list(content_box.get_children()):
                 content_box.remove(ch)
 
-            def apply_pixbuf_to_button(b, pix):
-                box = b.get_child()
+            def apply_pixbuf_to_button(box, pix):
                 if not box:
                     return False
                 children = list(box.get_children())
@@ -194,20 +195,20 @@ class ClipBar(Box):
                     new_img.set_from_pixbuf(pix)
                 return False
 
-            def load_and_apply(it_id, b=btn):
+            def load_and_apply(it_id, target_box):
                 raw = b""
                 if self.controller and hasattr(self.controller, "decode_item"):
                     raw = self.controller.decode_item(it_id)
                 pix = decode_and_scale(raw or b"", self.item_width, self.item_height)
                 if not pix:
                     return
-                GLib.idle_add(lambda p=pix, bb=b: apply_pixbuf_to_button(bb, p))
+                GLib.idle_add(lambda p=pix, bb=target_box: apply_pixbuf_to_button(bb, p))
 
             if is_img:
                 img = Image(name="clipbar-thumb")
                 content_box.add(img)
                 threading.Thread(
-                    target=load_and_apply, args=(item_id,), daemon=True
+                    target=load_and_apply, args=(item_id, content_box), daemon=True
                 ).start()
             else:
                 display = (content or "").strip()
@@ -218,12 +219,23 @@ class ClipBar(Box):
                 lbl = Label(
                     name="clipbar-text",
                     markup=markup,
-                    ellipsization="end",
-                    wrap=True,
-                    xalign=0.5,
-                    yalign=0.5,
+                    justification="left",
+                    ellipsization="none",
+                    line_wrap="word-char",
+                    h_align="fill",
+                    v_align="start",
                 )
-                content_box.add(lbl)
+                # Garantir largura máxima para provocar wrap real
+                text_box = Box(
+                    orientation="v",
+                    h_expand=False,
+                    v_expand=False,
+                    h_align="fill",
+                    v_align="fill",
+                )
+                text_box.set_size_request(max(1, self.item_width - 16), -1)
+                text_box.add(lbl)
+                content_box.add(text_box)
 
             if btn.get_parent() is None:
                 self.row.add(btn)
