@@ -14,7 +14,7 @@ from fabric.widgets.scrolledwindow import ScrolledWindow
 from clipboard.clipboardService import ClipboardService
 from clipboard.components.image_preview import is_image_data, decode_and_scale
 from clipboard.components.search import highlight_markup_multi
-from clipboard.components.render_utils import compute_computed_item_height
+# altura por item será medida dinamicamente; não usamos mais heurística global
 
 
 class ClipBar(Box):
@@ -117,10 +117,9 @@ class ClipBar(Box):
         for child in list(self.row.get_children()):
             self.row.remove(child)
 
-        computed_item_height = compute_computed_item_height(
-            render_candidates, self.item_width, self.item_height
-        )
-        self.set_size_request(-1, max(self.bar_height, computed_item_height + 16))
+        # altura inicial baseada no item base; ajustaremos após render por item
+        max_card_height = self.item_height
+        self.set_size_request(-1, max(self.bar_height, self.item_height + 16))
 
         if not render_candidates:
             for btn in self._buttons:
@@ -134,7 +133,7 @@ class ClipBar(Box):
                 h_align="center",
                 v_align="center",
             )
-            empty_box.set_size_request(self.item_width, computed_item_height)
+            empty_box.set_size_request(self.item_width, self.item_height)
             lbl = Label(
                 name="clipbar-empty",
                 label="(Clipboard vazio)" if not all_items else "(nenhum resultado)",
@@ -210,6 +209,7 @@ class ClipBar(Box):
                 threading.Thread(
                     target=load_and_apply, args=(item_id, content_box), daemon=True
                 ).start()
+                desired_h = self.item_height
             else:
                 display = (content or "").strip()
                 if len(display) > 600:
@@ -236,14 +236,23 @@ class ClipBar(Box):
                 text_box.set_size_request(max(1, self.item_width - 16), -1)
                 text_box.add(lbl)
                 content_box.add(text_box)
+                # medir altura natural do texto
+                try:
+                    _min_h, nat_h = lbl.get_preferred_height()
+                except Exception:
+                    nat_h = self.item_height
+                # incluir padding aproximado do card
+                desired_h = max(self.item_height, nat_h + 8)
 
             if btn.get_parent() is None:
                 self.row.add(btn)
-            btn.set_size_request(self.item_width, computed_item_height)
+            btn.set_size_request(self.item_width, desired_h)
             btn.set_tooltip_text("[Imagem]" if is_img else (content or "").strip())
             setattr(btn, "_mapped_index", orig_idx)
             btn.show()
 
+            if desired_h > max_card_height:
+                max_card_height = desired_h
             self._rendered_orig_indices.append(orig_idx)
 
         for j in range(len(render_candidates), len(self._buttons)):
@@ -258,6 +267,8 @@ class ClipBar(Box):
             if sel not in self._rendered_orig_indices and self._rendered_orig_indices:
                 self.controller.selected_index = self._rendered_orig_indices[0]
 
+        # ajustar altura da barra ao maior card medido
+        self.set_size_request(-1, max(self.bar_height, max_card_height + 8))
         self.show_all()
         GLib.idle_add(self._sync_button_selection_classes)
         GLib.idle_add(self._ensure_selection_visible)
