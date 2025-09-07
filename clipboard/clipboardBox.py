@@ -295,14 +295,17 @@ class ClipBar(Box):
     # Navegação pública usada pelo Layer
     def navigate(self, delta: int):
         # Se há filtro e mapeamento, navega dentro do subconjunto
-        if (self.controller and (self.controller.query or "").strip()) and self._rendered_orig_indices:
+        ctl = self.controller
+        if (ctl and (ctl.query or "").strip()) and self._rendered_orig_indices:
             self._move_within_filtered(delta)
         else:
-            # delega ao Service
+            # delega ao Service, somente se houver controller
+            if not ctl:
+                return
             if delta < 0:
-                self.controller.move_left()
+                ctl.move_left()
             else:
-                self.controller.move_right()
+                ctl.move_right()
         # Só força foco no item se o entry não estiver com foco
         try:
             if not (getattr(self, "search_entry", None) and self.search_entry.has_focus()):
