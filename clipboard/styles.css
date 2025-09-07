@@ -3,7 +3,7 @@
 }
 
 #clipbar-root {
-    background-color: transparent;
+    background-color: var(--background-blur-no-active);
     padding: 8px;
 }
 
