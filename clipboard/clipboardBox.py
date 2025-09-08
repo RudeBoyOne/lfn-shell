@@ -14,6 +14,7 @@ from fabric.widgets.scrolledwindow import ScrolledWindow
 from clipboard.clipboardService import ClipboardService
 from clipboard.components.image_preview import is_image_data, decode_and_scale
 from clipboard.components.search import highlight_markup_multi
+from .assets import icons
 
 
 class ClipBar(Box):
@@ -69,14 +70,23 @@ class ClipBar(Box):
         )
         self.search_entry.connect("changed", lambda *_: self._on_search_changed())
 
-        self.add(
-            Box(
-                orientation="h",
-                h_expand=True,
-                h_align="center",
-                children=[self.search_entry],
-            )
+        # Header: busca + botão de limpar histórico
+        header_box = Box(
+            orientation="h",
+            spacing=6,
+            h_expand=True,
+            h_align="center",
         )
+        header_box.add(self.search_entry)
+        self.clear_btn = Button(
+            name="clipbar-clear",
+            label= icons.trash,
+            tooltip_text="Limpar histórico",
+            size=30,
+        )
+        self.clear_btn.connect("clicked", lambda *_: self._on_clear_clicked())
+        header_box.add(self.clear_btn)
+        self.add(header_box)
         self.add(self.scroll)
         self.set_size_request(-1, self.bar_height)
 
@@ -467,6 +477,13 @@ class ClipBar(Box):
             except Exception:
                 pass
         self._render_items()
+
+    def _on_clear_clicked(self):
+        if self.controller and hasattr(self.controller, "wipe_history"):
+            try:
+                self.controller.wipe_history()
+            except Exception:
+                pass
 
     def _focus_search_entry(self):
         if getattr(self, "search_entry", None):

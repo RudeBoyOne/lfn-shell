@@ -38,3 +38,13 @@
     padding: 6px;
     border-radius: 5px;
 }
+
+#clipbar-clear {
+    border: 2px solid var(--on-error);
+    border-radius: 5px;
+}
+
+#clipbar-clear:hover {
+    background-color: var(--error-container);
+    border-radius: 5px;
+}

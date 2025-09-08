@@ -2,6 +2,7 @@ import subprocess
 from typing import List, Tuple
 import logging
 from gi.repository import GLib
+import threading
 
 from fabric.core.service import Service, Signal, Property
 from fabric import Fabricator
@@ -212,3 +213,16 @@ class ClipboardService(Service):
 
     def request_close(self):
         self.close_requested()
+
+    def wipe_history(self):
+        """Apaga todo histórico do cliphist.
+
+        Executa em thread para não bloquear o loop GTK. O Fabricator
+        fará o refresh no próximo tick.
+        """
+        def _worker():
+            try:
+                subprocess.run(["cliphist", "wipe"], check=True)
+            except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+                logger.exception("wipe_history failed (cliphist)")
+        threading.Thread(target=_worker, daemon=True).start()
