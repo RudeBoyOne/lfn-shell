@@ -22,6 +22,8 @@ class ClipBar(Box):
         max_items=50,
         bar_height=56,
         item_width=260,
+        initial_chunk: int = 48,
+        chunk_size: int = 96,
         controller: Optional[ClipboardService] = None,
         item_height: Optional[int] = None,
         **kwargs
@@ -98,8 +100,14 @@ class ClipBar(Box):
         self._terms_current = []
         self._max_card_height = self.item_height
         # Tamanhos de chunk: primeiro lote pequeno para abrir rápido
-        self._initial_chunk = 48
-        self._chunk_size = 96
+        try:
+            self._initial_chunk = max(1, int(initial_chunk))
+        except Exception:
+            self._initial_chunk = 48
+        try:
+            self._chunk_size = max(self._initial_chunk, int(chunk_size))
+        except Exception:
+            self._chunk_size = max(self._initial_chunk, 96)
 
         # Primeira renderização
         self._render_items()
@@ -130,6 +138,16 @@ class ClipBar(Box):
             filtered = [(i, itm_id, txt) for i, (itm_id, txt) in enumerate(all_items)]
 
         render_candidates = filtered[: self.max_items]
+
+        # Se não há filtro, garanta que a seleção atual esteja dentro do intervalo renderizado [0..len-1]
+        if self.controller and not terms:
+            sel = self.controller.selected_index
+            max_idx = len(render_candidates) - 1
+            if max_idx >= 0:
+                if sel > max_idx:
+                    self.controller.selected_index = max_idx
+                elif sel < 0:
+                    self.controller.selected_index = 0
 
         # Limpar UI atual
         for child in list(self.row.get_children()):
@@ -338,6 +356,7 @@ class ClipBar(Box):
         except ValueError:
             # se o selecionado não está visível, vai para o começo/fim
             pos = 0 if delta > 0 else len(self._rendered_orig_indices) - 1
+        # clamp estrito dentro do intervalo renderizado
         new_pos = max(0, min(pos + delta, len(self._rendered_orig_indices) - 1))
         new_orig_idx = self._rendered_orig_indices[new_pos]
         if new_orig_idx != sel:
@@ -347,12 +366,12 @@ class ClipBar(Box):
 
     # Navegação pública usada pelo Layer
     def navigate(self, delta: int):
-        # Se há filtro e mapeamento, navega dentro do subconjunto
+        # Sempre respeita o subconjunto atualmente renderizado
         ctl = self.controller
-        if (ctl and (ctl.query or "").strip()) and self._rendered_orig_indices:
+        if self._rendered_orig_indices:
             self._move_within_filtered(delta)
         else:
-            # delega ao Service, somente se houver controller
+            # fallback: delega ao Service apenas se não há nada renderizado
             if not ctl:
                 return
             if delta < 0:

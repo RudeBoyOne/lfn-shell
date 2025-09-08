@@ -61,11 +61,18 @@ class ClipboardService(Service):
                 logger.debug("cliphist list failed", exc_info=True)
                 return ""
 
+        def _on_changed_safe(_f, v: str):
+            # Garante atualização no main loop GTK
+            def _apply():
+                self._on_history_changed(v)
+                return False
+            GLib.idle_add(_apply)
+
         self._fabric = Fabricator(
             interval=interval_ms,
             default_value="",
             poll_from=poll_history,
-            on_changed=lambda f, v: self._on_history_changed(v),
+            on_changed=_on_changed_safe,
         )
 
     # Propriedade pública: query (valor já debounced)
