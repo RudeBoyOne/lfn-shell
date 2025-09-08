@@ -14,23 +14,24 @@ class ClipboardService(Service):
     def items(self) -> list:
         return self._items
 
-    @items.setter
-    def items(self, value: list):
+    def _set_items(self, value: list):
         # evita notify desnecessário
         if value == getattr(self, "_items", []):
             return
         self._items = value
+    # Evita redeclaração para analisadores estáticos
+    items = items.setter(_set_items)
 
     @Property(int, flags="read-write")
     def selected_index(self) -> int:
         return self._selected_index
 
-    @selected_index.setter
-    def selected_index(self, value: int):
+    def _set_selected_index(self, value: int):
         # evita notify desnecessário
         if value == getattr(self, "_selected_index", -1):
             return
         self._selected_index = value
+    selected_index = selected_index.setter(_set_selected_index)
 
     @Signal
     def close_requested(self) -> None: ...
@@ -57,8 +58,8 @@ class ClipboardService(Service):
                     check=True,
                 ).stdout
                 return out.strip()
-            except subprocess.CalledProcessError:
-                logger.debug("cliphist list failed", exc_info=True)
+            except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+                logger.debug("cliphist list failed or command not found", exc_info=True)
                 return ""
 
         def _on_changed_safe(_f, v: str):
@@ -80,12 +81,12 @@ class ClipboardService(Service):
     def query(self) -> str:
         return self._query
 
-    @query.setter
-    def query(self, value: str):
+    def _set_query(self, value: str):
         norm = (value or "").lower()
         if norm == getattr(self, "_query", ""):
             return
         self._query = norm
+    query = query.setter(_set_query)
 
     # Entrada imediata de texto (debounce para publicar em `query`)
     def update_query_input(self, text: str):
@@ -177,8 +178,8 @@ class ClipboardService(Service):
         try:
             result = subprocess.run(["cliphist", "decode", item_id], capture_output=True, check=True)
             subprocess.run(["wl-copy"], input=result.stdout, check=True)
-        except subprocess.CalledProcessError:
-            logger.exception("paste_item failed for %s", item_id)
+        except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+            logger.exception("paste_item failed for %s (cliphist/wl-copy)", item_id)
 
     def decode_item(self, item_id: str) -> bytes:
         """Decode an item using cliphist and return raw bytes.
@@ -190,8 +191,8 @@ class ClipboardService(Service):
         try:
             result = subprocess.run(["cliphist", "decode", item_id], capture_output=True, check=True)
             return result.stdout
-        except subprocess.CalledProcessError:
-            logger.debug("decode_item failed for %s", item_id, exc_info=True)
+        except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+            logger.debug("decode_item failed for %s (command error or not found)", item_id, exc_info=True)
             return b""
 
     def delete_current(self):
@@ -203,8 +204,8 @@ class ClipboardService(Service):
     def delete_item(self, item_id: str):
         try:
             subprocess.run(["cliphist", "delete", item_id], check=True)
-        except subprocess.CalledProcessError:
-            logger.exception("delete_item failed for %s", item_id)
+        except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+            logger.exception("delete_item failed for %s (cliphist)", item_id)
         finally:
             # Fabricator vai atualizar no próximo tick
             pass
