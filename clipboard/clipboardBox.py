@@ -91,18 +91,36 @@ class ClipBar(Box):
                 lambda *_: GLib.idle_add(self._on_selected_index_changed),
             )
             self.controller.connect("notify::query", lambda *_: self._on_query_changed())
+        # Estado de renderização incremental
+        self._render_queue = []  # List[Tuple[orig_idx, item_id, content]]
+        self._current_render_index = 0
+        self._render_idle_id = 0
+        self._terms_current = []
+        self._max_card_height = self.item_height
+        # Tamanhos de chunk: primeiro lote pequeno para abrir rápido
+        self._initial_chunk = 48
+        self._chunk_size = 96
 
+        # Primeira renderização
         self._render_items()
         GLib.idle_add(self._sync_button_selection_classes)
         GLib.idle_add(self._focus_search_entry)
 
     def _render_items(self):
+        # Cancelar renderização pendente
+        if getattr(self, "_render_idle_id", 0):
+            try:
+                GLib.source_remove(self._render_idle_id)
+            except Exception:
+                pass
+            self._render_idle_id = 0
+
         all_items = self.controller.items if self.controller else []
         # pega filtro atual do service (normalizado)
         self._filter_text = (self.controller.query or "") if self.controller else ""
         terms = [t for t in (self._filter_text.split() if self._filter_text else []) if t]
         if terms:
-            # AND: todos os termos devem existir no texto
+            # AND: todos os termos devem existir no texto (case-insensitive)
             filtered = [
                 (i, itm_id, txt)
                 for i, (itm_id, txt) in enumerate(all_items)
@@ -113,18 +131,20 @@ class ClipBar(Box):
 
         render_candidates = filtered[: self.max_items]
 
+        # Limpar UI atual
         for child in list(self.row.get_children()):
             self.row.remove(child)
+        # Ocultar todos botões antigos até serem reusados
+        for btn in self._buttons:
+            btn.hide()
+            setattr(btn, "_mapped_index", None)
+            btn.get_style_context().remove_class("suggested-action")
 
-        # altura inicial baseada no item base; ajustaremos após render por item
-        max_card_height = self.item_height
+        # Altura inicial baseada no item base; ajustaremos após chunks
+        self._max_card_height = self.item_height
         self.set_size_request(-1, max(self.bar_height, self.item_height + 16))
 
         if not render_candidates:
-            for btn in self._buttons:
-                btn.hide()
-                setattr(btn, "_mapped_index", None)
-                btn.get_style_context().remove_class("suggested-action")
             empty_box = Box(
                 orientation="v",
                 h_expand=True,
@@ -145,9 +165,25 @@ class ClipBar(Box):
             self.show_all()
             return
 
+        # Preparar fila de render e estado
         self._rendered_orig_indices = []
-        needed = len(render_candidates)
-        while len(self._buttons) < needed:
+        self._render_queue = list(render_candidates)
+        self._terms_current = terms
+        self._current_render_index = 0
+
+        # Renderizar primeiro lote imediatamente
+        first_count = min(len(self._render_queue), self._initial_chunk)
+        if first_count > 0:
+            self._render_chunk(first_count)
+        # Agendar o restante em idle
+        if self._current_render_index < len(self._render_queue):
+            self._schedule_more()
+        # Sincronizar seleção após primeiro paint
+        GLib.idle_add(self._sync_button_selection_classes)
+        GLib.idle_add(self._ensure_selection_visible)
+
+    def _ensure_button_pool(self, up_to_index: int):
+        while len(self._buttons) <= up_to_index:
             content_box = Box(
                 orientation="v",
                 spacing=6,
@@ -170,11 +206,19 @@ class ClipBar(Box):
             self._buttons.append(card)
             self._content_boxes.append(content_box)
 
-        for idx, (orig_idx, item_id, content) in enumerate(render_candidates):
-            is_img = is_image_data(content)
+    def _render_chunk(self, count: int):
+        start = self._current_render_index
+        end = min(len(self._render_queue), start + count)
+        if start >= end:
+            return
+        terms = self._terms_current
+        for idx in range(start, end):
+            orig_idx, item_id, content = self._render_queue[idx]
+            self._ensure_button_pool(idx)
             btn = self._buttons[idx]
             content_box = self._content_boxes[idx]
 
+            # Limpar conteúdo do card
             for ch in list(content_box.get_children()):
                 content_box.remove(ch)
 
@@ -201,6 +245,7 @@ class ClipBar(Box):
                     return
                 GLib.idle_add(lambda p=pix, bb=target_box: apply_pixbuf_to_button(bb, p))
 
+            is_img = is_image_data(content)
             if is_img:
                 img = Image(name="clipbar-thumb")
                 content_box.add(img)
@@ -212,7 +257,6 @@ class ClipBar(Box):
                 display = (content or "").strip()
                 if len(display) > 600:
                     display = display[:597] + "..."
-                # aplica destaque via pango markup multi-termo
                 markup = highlight_markup_multi(display, terms)
                 lbl = Label(
                     name="clipbar-text",
@@ -223,7 +267,6 @@ class ClipBar(Box):
                     h_align="fill",
                     v_align="start",
                 )
-                # Garantir largura máxima para provocar wrap real
                 text_box = Box(
                     orientation="v",
                     h_expand=False,
@@ -234,12 +277,10 @@ class ClipBar(Box):
                 text_box.set_size_request(max(1, self.item_width - 16), -1)
                 text_box.add(lbl)
                 content_box.add(text_box)
-                # medir altura natural do texto
                 try:
                     _min_h, nat_h = lbl.get_preferred_height()
                 except Exception:
                     nat_h = self.item_height
-                # incluir padding aproximado do card
                 desired_h = max(self.item_height, nat_h + 8)
 
             if btn.get_parent() is None:
@@ -249,27 +290,41 @@ class ClipBar(Box):
             setattr(btn, "_mapped_index", orig_idx)
             btn.show()
 
-            if desired_h > max_card_height:
-                max_card_height = desired_h
+            if desired_h > self._max_card_height:
+                self._max_card_height = desired_h
             self._rendered_orig_indices.append(orig_idx)
 
-        for j in range(len(render_candidates), len(self._buttons)):
-            self._buttons[j].hide()
-            setattr(self._buttons[j], "_mapped_index", None)
-            self._buttons[j].get_style_context().remove_class("suggested-action")
+        self._current_render_index = end
+        # Atualizar altura após o chunk
+        self.set_size_request(-1, max(self.bar_height, self._max_card_height + 8))
+        self.show_all()
 
         # Se há filtro ativo e o item selecionado não está visível,
-        # move a seleção para o primeiro resultado
-        if terms and self.controller:
+        # move a seleção para o primeiro resultado após primeiro chunk
+        if self._current_render_index == end and self._terms_current and self.controller:
             sel = self.controller.selected_index
             if sel not in self._rendered_orig_indices and self._rendered_orig_indices:
                 self.controller.selected_index = self._rendered_orig_indices[0]
 
-        # ajustar altura da barra ao maior card medido
-        self.set_size_request(-1, max(self.bar_height, max_card_height + 8))
-        self.show_all()
-        GLib.idle_add(self._sync_button_selection_classes)
-        GLib.idle_add(self._ensure_selection_visible)
+    def _render_more(self):
+        remaining = len(self._render_queue) - self._current_render_index
+        if remaining <= 0:
+            self._render_idle_id = 0
+            return False
+        count = min(self._chunk_size, remaining)
+        self._render_chunk(count)
+        still = (len(self._render_queue) - self._current_render_index) > 0
+        if not still:
+            self._render_idle_id = 0
+        return still
+
+    def _schedule_more(self):
+        if getattr(self, "_render_idle_id", 0):
+            try:
+                GLib.source_remove(self._render_idle_id)
+            except Exception:
+                pass
+        self._render_idle_id = GLib.idle_add(self._render_more)
 
     def _move_within_filtered(self, delta: int):
         if not self.controller:
