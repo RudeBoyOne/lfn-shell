@@ -8,3 +8,4 @@ venv
 *.pyd
 *.pdb
 .github/
+clipboard.code-workspace
