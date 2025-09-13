@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 class PowerService(Service):
     """Service responsável por executar ações de energia.
 
-    Centraliza side-effects / subprocessos. A UI (Box/Layer) só chama métodos deste Service.
+    Centraliza side-effects / subprocessos. A UI (Box) só chama métodos deste Service.
 
     Métodos expostos:
     - lock_session
@@ -21,7 +21,7 @@ class PowerService(Service):
     def close_requested(self) -> None: ...
 
     @Signal
-    def action_executed(self, action: str) -> None: ...  # action: "lock"|"logout"|"reboot"|"shutdown"
+    def action_executed(self, action: str) -> None: ...
 
     @Signal
     def action_failed(self, action: str, message: str) -> None: ...
@@ -33,12 +33,12 @@ class PowerService(Service):
     def _run(self, action: str, cmd: str):
         """Executa comando assíncrono e sinaliza resultado.
 
-        Mantém interface simples; erros são logados e propagados via sinal.
+        Interface simples; erros logados e propagados via sinal.
         """
         try:
             exec_shell_command_async(cmd)
             self.action_executed(action)
-        except Exception as e:  # proteção ampla para não quebrar UI
+        except Exception as e:
             logger.exception("power action failed: %s", action)
             self.action_failed(action, str(e))
         finally:
@@ -50,7 +50,6 @@ class PowerService(Service):
         self._run("lock", "hyprlock")
 
     def logout_session(self):
-        # Ajuste comando conforme compositor/WM; Hyprland usa hyprctl dispatch exit
         self._run("logout", "hyprctl dispatch exit")
 
     def reboot_system(self):

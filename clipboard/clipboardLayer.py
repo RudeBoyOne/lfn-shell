@@ -2,7 +2,6 @@ import gi
 
 from gi.repository import GLib
 from widgets.WindowWayland import WaylandWindow as Window
-# from fabric.widgets.wayland import WaylandWindow as Window
 
 from clipboard.clipboardBox import ClipBar
 from clipboard.clipboardService import ClipboardService
