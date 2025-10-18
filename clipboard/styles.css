@@ -39,6 +39,13 @@
     border-radius: 5px;
 }
 
+#clipbar-count {
+    color: #e0e0e0;
+    font-size: 16px;
+    font-weight: bold;
+    margin-right: 8px;
+}
+
 #clipbar-clear {
     border: 2px solid var(--on-error);
     border-radius: 5px;

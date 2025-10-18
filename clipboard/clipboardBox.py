@@ -79,6 +79,7 @@ class ClipBar(Box):
         )
         self.scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
 
+        self.count_label = Label(name="clipbar-count", label="0 itens")
         self.search_entry = Entry(
             placeholder="Buscar...",
             style_classes="clipbar-search",
@@ -96,6 +97,7 @@ class ClipBar(Box):
             h_expand=True,
             h_align="center",
         )
+        header_box.add(self.count_label)
         header_box.add(self.search_entry)
         self.clear_btn = Button(
             name="clipbar-clear",
@@ -157,6 +159,9 @@ class ClipBar(Box):
             terms,
             self.max_items,
         )
+        total_items = len(all_items)
+        shown_items = len(render_candidates)
+        self._update_count_label(shown_items, total_items)
 
         if self.controller:
             new_selection = adjust_selection_for_candidates(
@@ -552,3 +557,13 @@ class ClipBar(Box):
         except (AttributeError, RuntimeError):
             logger.debug("focus entry failed", exc_info=True)
         return False
+
+    def _update_count_label(
+        self,
+        shown: int,
+        total: Optional[int] = None,
+    ) -> None:
+        if not getattr(self, "count_label", None):
+            return
+        label_value = "item" if shown == 1 else "itens"
+        self.count_label.set_label(f"{shown} {label_value}")
