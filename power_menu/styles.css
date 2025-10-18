@@ -19,11 +19,12 @@
 
 #power-menu-button:hover {
   background-color: var(--background-blur-active);
+  border-color: var(--inverse-primary);
 }
 
 #power-menu-button:focus, #power-menu-button:focus-within, #power-menu-button.suggested-action {
   border-color: var(--primary);
-  background-color: var(--background-blur-active);
+  background-color: var(--inverse-primary);
 }
 
 #power-menu-button > #button-label {

@@ -9,14 +9,14 @@ from power_menu.powerLayer import PowerLayer
 
 
 if __name__ == "__main__":
-    
+
     app = Application("lfn-shell")
 
     def set_css():
         app.set_stylesheet_from_file(
             get_relative_path("main.css"),
         )
-        
+
     app.set_css = set_css
 
     app.set_css()

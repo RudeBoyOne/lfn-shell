@@ -14,7 +14,7 @@
 }
 
 #clipbar-item.suggested-action {
-    background-color: var(--background-blur-active);
+    background-color: var(--inverse-primary);
     border: 2px solid var(--primary);
 }
 

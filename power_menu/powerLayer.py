@@ -1,10 +1,16 @@
+from gi.repository import GLib
+
 from widgets.WindowWayland import WaylandWindow as Window
-from .powerBox import PowerMenu
-from .powerService import PowerService
+from power_menu.powerBox import PowerMenu
+from power_menu.powerService import PowerService
+from util.singleton_layer import SingletonLayerMixin
 
 
-class PowerLayer(Window):
+class PowerLayer(SingletonLayerMixin, Window):
     def __init__(self):
+        if not self._prepare_singleton():
+            return
+
         service = PowerService()
         menu = PowerMenu(controller=service)
 
@@ -17,10 +23,21 @@ class PowerLayer(Window):
             keyboard_mode="exclusive",
             all_visible=True,
             child=menu,
-            margin="0px 0px 0px 5px"
+            margin="0px 0px 0px 5px",
         )
         self.service = service
         self.child = menu
+
+        self._register_singleton_cleanup()
+
+        def _focus_later():
+            try:
+                self.child.grab_focus()
+            except (AttributeError, RuntimeError):
+                pass
+            return False
+
+        GLib.idle_add(_focus_later)
 
         # Fechamento
         self.service.connect("close-requested", lambda *_: self.close())

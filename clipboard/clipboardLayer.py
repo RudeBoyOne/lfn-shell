@@ -1,14 +1,16 @@
-import gi
-
 from gi.repository import GLib
 from widgets.WindowWayland import WaylandWindow as Window
+from util.singleton_layer import SingletonLayerMixin
 
 from clipboard.clipboardBox import ClipBar
 from clipboard.clipboardService import ClipboardService
 
 
-class ClipboardLayer(Window):
+class ClipboardLayer(SingletonLayerMixin, Window):
     def __init__(self):
+        if not self._prepare_singleton():
+            return
+
         # cria Service
         service = ClipboardService(interval_ms=1500)
 
@@ -33,6 +35,8 @@ class ClipboardLayer(Window):
         )
         self.child = bar
         self.service = service
+
+        self._register_singleton_cleanup()
 
         # teclas -> Service
         # helper para mover e agendar foco, reduz duplicação
@@ -61,13 +65,20 @@ class ClipboardLayer(Window):
         self.add_keybinding("Escape", lambda *_: self.service.request_close())
 
         # fechar quando o Service pedir
-        self.service.connect("close-requested", lambda *_: self.close() if hasattr(self, "close") else self.application.quit())
+        def _close_request(*_):
+            if hasattr(self, "close"):
+                self.close()
+            else:
+                self.application.quit()
+
+        self.service.connect("close-requested", _close_request)
 
         # foco inicial
         def _focus_later():
             try:
                 self.child.grab_focus()
-            except Exception:
+            except (AttributeError, RuntimeError):
                 pass
             return False
+
         GLib.idle_add(_focus_later)
