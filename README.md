@@ -4,8 +4,8 @@
 
 ### Componentes:
 
-    [x] clipboard
-    [x] power-menu
-    [] notifications
-    [] notification-center
-    [] status bar
+- [x] clipboard
+- [x] power-menu
+- [ ] notifications
+- [ ] notification-center
+- [ ] status bar
