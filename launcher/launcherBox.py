@@ -73,7 +73,8 @@ class LauncherBox(Box):
             propagate_height=False,
         )
         self.scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        self._list_min_height = self.icon_size * 6
+        self._max_visible_rows = 4
+        self._row_height = max(self.icon_size + 17, 64)
 
         self.add(header)
         self.add(self.scroll)
@@ -152,30 +153,30 @@ class LauncherBox(Box):
         self._buttons = []
 
         query_active = bool(self.service and (self.service.query or ""))
-        if hasattr(self.scroll, "set_visible"):
-            self.scroll.set_visible(query_active)
-        elif query_active:
-            self.scroll.show()
-        else:
-            self.scroll.hide()
-
         if query_active:
-            try:
-                self.scroll.set_min_content_height(self._list_min_height)
-            except AttributeError:
-                self.scroll.set_size_request(-1, self._list_min_height)
-            self.scroll.set_vexpand(True)
+            if hasattr(self.scroll, "set_visible"):
+                self.scroll.set_visible(True)
+            else:
+                self.scroll.show()
         else:
-            try:
-                self.scroll.set_min_content_height(0)
-            except AttributeError:
-                self.scroll.set_size_request(-1, -1)
-            self.scroll.set_vexpand(False)
-
-        if not query_active:
-            self.scroll.hide()
+            if hasattr(self.scroll, "set_visible"):
+                self.scroll.set_visible(False)
+            else:
+                self.scroll.hide()
             self.queue_resize()
             return
+
+        item_count = len(items)
+        visible_rows = max(
+            1,
+            min(item_count if item_count else 0, self._max_visible_rows),
+        )
+        desired_height = self._row_height * visible_rows
+        try:
+            self.scroll.set_min_content_height(desired_height)
+        except AttributeError:
+            self.scroll.set_size_request(-1, desired_height)
+        self.scroll.set_vexpand(item_count > self._max_visible_rows)
 
         if not items:
             self._render_empty_state()
