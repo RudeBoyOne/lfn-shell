@@ -1,0 +1,51 @@
+#launcher-root {
+    background-color: var(--background-blur-no-active);
+    border-radius: 8px;
+}
+
+#launcher-search {
+    background-color: var(--background-blur-no-active);
+    border: 2px solid var(--primary);
+    border-radius: 6px;
+    padding: 6px;
+    font-size: 16px;
+}
+
+#launcher-scroll {
+    border-radius: 6px;
+    padding: 6px;
+}
+
+#launcher-list {
+    padding: 4px 0;
+}
+
+#launcher-item {
+    background-color: var(--background-blur-no-active);
+    border-radius: 6px;
+    padding: 8px;
+}
+
+#launcher-item:hover {
+    background-color: var(--primary-container);
+}
+
+#launcher-item.launcher-item-selected {
+    background-color: var(--inverse-primary);
+}
+
+
+#launcher-item-icon {
+    margin-right: 8px;
+}
+
+#launcher-item-title {
+    color: #f5f5f5;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+#launcher-empty {
+    color: #9a9a9a;
+    font-style: italic;
+}
