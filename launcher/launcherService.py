@@ -2,7 +2,7 @@ import logging
 import unicodedata
 from typing import Dict, List, Optional, Tuple
 
-from gi.repository import GLib
+from gi.repository import GdkPixbuf, Gio, GLib
 
 from fabric.core.service import Property, Service, Signal
 from fabric.utils import DesktopApp, get_desktop_applications
@@ -152,11 +152,7 @@ class LauncherService(Service):
         app = self._apps_by_id.get(app_id)
         if app is None:
             return None
-        try:
-            pixbuf = app.get_icon_pixbuf(size=size)
-        except (GLib.Error, RuntimeError, ValueError):
-            logger.debug("failed to load icon for %s", app_id, exc_info=True)
-            pixbuf = None
+        pixbuf = self._load_icon_pixbuf(app, size)
         self._icon_cache[cache_key] = pixbuf
         return pixbuf
 
@@ -248,6 +244,54 @@ class LauncherService(Service):
         except (RuntimeError, ValueError):
             pass
         self._query_timer_id = None
+
+    def _load_icon_pixbuf(
+        self,
+        app: DesktopApp,
+        size: int,
+    ):
+        pixbuf = self._try_theme_icon(app, size)
+        if pixbuf is not None:
+            return pixbuf
+        pixbuf = self._try_file_icon(app, size)
+        if pixbuf is not None:
+            return pixbuf
+        try:
+            return app.get_icon_pixbuf(size=size)
+        except (GLib.Error, RuntimeError, ValueError):
+            logger.debug("failed to load icon for %s", app.name, exc_info=True)
+            return None
+
+    @staticmethod
+    def _try_theme_icon(app: DesktopApp, size: int):
+        try:
+            return app.get_icon_pixbuf(size=size, default_icon=None)
+        except (GLib.Error, RuntimeError, ValueError):
+            return None
+
+    @staticmethod
+    def _try_file_icon(app: DesktopApp, size: int):
+        icon = getattr(app, "icon", None)
+        if not isinstance(icon, Gio.FileIcon):
+            return None
+        file_obj = icon.get_file()
+        if file_obj is None:
+            return None
+        path = file_obj.get_path()
+        if not path:
+            return None
+        try:
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+                path,
+                width=size,
+                height=size,
+                preserve_aspect_ratio=True,
+            )
+            setattr(app, "_pixbuf", pixbuf)
+            return pixbuf
+        except (GLib.Error, RuntimeError, ValueError):
+            logger.debug("failed to read icon file %s", path, exc_info=True)
+            return None
 
     @staticmethod
     def _normalize_text(value: Optional[str]) -> str:
