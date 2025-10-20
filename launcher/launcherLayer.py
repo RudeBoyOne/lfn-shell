@@ -27,10 +27,7 @@ class LauncherLayer(SingletonLayerMixin, Window):
         )
         self.service = service
         self.child = box
-
         self._register_singleton_cleanup()
-
-        self.service.refresh_apps()
 
         def _focus_later():
             try:
