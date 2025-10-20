@@ -40,10 +40,6 @@ class LauncherLayer(SingletonLayerMixin, Window):
 
         self.add_keybinding("Down", lambda *_: self.child.navigate(1))
         self.add_keybinding("Up", lambda *_: self.child.navigate(-1))
-        self.add_keybinding(
-            "Return",
-            lambda *_: self.service.launch_selected(),
-        )
         self.add_keybinding("Escape", lambda *_: self._close_launcher())
         self.service.connect(
             "close-requested",

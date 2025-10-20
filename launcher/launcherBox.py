@@ -73,6 +73,9 @@ class LauncherBox(Box):
             propagate_height=False,
         )
         self.scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        if hasattr(self.scroll, "set_no_show_all"):
+            self.scroll.set_no_show_all(True)
+        self.scroll.hide()
         self._max_visible_rows = 4
         self._row_height = max(self.icon_size + 17, 64)
 
@@ -158,11 +161,16 @@ class LauncherBox(Box):
                 self.scroll.set_visible(True)
             else:
                 self.scroll.show()
+            if hasattr(self.scroll, "set_no_show_all"):
+                self.scroll.set_no_show_all(False)
         else:
+            if hasattr(self.scroll, "set_no_show_all"):
+                self.scroll.set_no_show_all(True)
             if hasattr(self.scroll, "set_visible"):
                 self.scroll.set_visible(False)
             else:
                 self.scroll.hide()
+            self._apply_scroll_height(0, False)
             self.queue_resize()
             return
 
@@ -315,15 +323,23 @@ class LauncherBox(Box):
 
     def _update_scroll_height(self, item_count: int) -> None:
         max_height = self._row_height * self._max_visible_rows
-        height = self._row_height
+        children = list(self.viewport.get_children())
+        if not children:
+            self._apply_scroll_height(0, False)
+            return
+
+        get_pref = getattr(self.viewport, "get_preferred_height", None)
+        if callable(get_pref):
+            minimum, natural = get_pref()
+            height = natural or minimum or self._row_height
+        else:
+            height = self._row_height * max(1, item_count)
+
         if item_count > 0:
-            get_pref = getattr(self.viewport, "get_preferred_height", None)
-            if callable(get_pref):
-                minimum, natural = get_pref()
-                height = natural or minimum or (self._row_height * item_count)
-            else:
-                height = self._row_height * item_count
             height = max(self._row_height, min(height, max_height))
+        else:
+            height = max(self._row_height, height)
+
         self._apply_scroll_height(height, item_count > self._max_visible_rows)
 
     def _apply_scroll_height(self, height: int, expand: bool) -> None:

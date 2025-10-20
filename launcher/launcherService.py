@@ -1,11 +1,15 @@
 import logging
 import unicodedata
 from typing import Dict, List, Optional, Tuple
+from urllib.parse import quote_plus
 
-from gi.repository import GdkPixbuf, Gio, GLib
+from gi.repository import Gdk, GdkPixbuf, Gio, GLib, Gtk
 
 from fabric.core.service import Property, Service, Signal
 from fabric.utils import DesktopApp, get_desktop_applications
+
+from launcher.components.query_models import QueryAction
+from launcher.components.query_router import route_special_query
 
 
 logger = logging.getLogger(__name__)
@@ -62,6 +66,7 @@ class LauncherService(Service):
         self._all_apps: List[DesktopApp] = []
         self._apps_by_id: Dict[str, DesktopApp] = {}
         self._icon_cache: Dict[Tuple[str, int], Optional[object]] = {}
+        self._special_actions: Dict[str, QueryAction] = {}
         self.refresh_apps()
 
     def refresh_apps(self) -> None:
@@ -121,6 +126,13 @@ class LauncherService(Service):
         self.launch_by_id(app_id)
 
     def launch_by_id(self, app_id: str) -> None:
+        action = self._special_actions.get(app_id)
+        if action is not None:
+            self._execute_special_action(action)
+            return
+        if app_id.startswith("__special__"):
+            logger.debug("no action mapped for special id %s", app_id)
+            return
         app = self._apps_by_id.get(app_id)
         if app is None:
             logger.debug("no application mapped for id %s", app_id)
@@ -134,6 +146,51 @@ class LauncherService(Service):
 
     def request_close(self) -> None:
         self.close_requested()
+
+    def _execute_special_action(self, action: QueryAction) -> None:
+        if action.kind == "web-search":
+            self._perform_web_search(action.payload.get("term", ""))
+            return
+        if action.kind == "calc-result":
+            self._handle_calc_action(action.payload)
+            return
+        logger.debug("unknown special action kind %s", action.kind)
+
+    def _perform_web_search(self, term: str) -> None:
+        normalized = (term or "").strip()
+        if not normalized:
+            return
+        encoded = quote_plus(normalized)
+        uri = f"https://www.google.com/search?q={encoded}"
+        try:
+            Gio.AppInfo.launch_default_for_uri(uri, None)
+        except (GLib.Error, RuntimeError, ValueError):
+            logger.exception("failed to open web search for %s", normalized)
+            return
+        self.request_close()
+
+    def _handle_calc_action(self, payload: Dict[str, str]) -> None:
+        result = (payload.get("result") or "").strip()
+        if not result:
+            return
+        if not self._copy_to_clipboard(result):
+            logger.debug("unable to copy calculation result to clipboard")
+        self.request_close()
+
+    @staticmethod
+    def _copy_to_clipboard(text: str) -> bool:
+        display = Gdk.Display.get_default()
+        if display is None:
+            return False
+        clipboard = Gtk.Clipboard.get_default(display)
+        if clipboard is None:
+            return False
+        try:
+            clipboard.set_text(text, -1)
+            clipboard.store()
+        except (RuntimeError, ValueError):
+            return False
+        return True
 
     def get_app_details(self, app_id: str) -> Dict[str, str]:
         app = self._apps_by_id.get(app_id)
@@ -164,6 +221,20 @@ class LauncherService(Service):
         return [term for term in normalized_terms if term]
 
     def _rebuild_items(self) -> None:
+        special = route_special_query(self._query)
+        self._special_actions = dict(special.actions)
+
+        if special.consume:
+            self._apps_by_id = {}
+            special_items = list(special.items)
+            self.items = special_items
+            if not special_items:
+                self.selected_index = -1
+            elif self._selected_index < 0 or self._selected_index >= len(special_items):
+                self.selected_index = 0
+            return
+
+        prefix_items = list(special.items) if special.items else []
         terms = self._normalized_terms()
         seen: Dict[str, int] = {}
         items: List[Tuple[str, str]] = []
@@ -171,9 +242,12 @@ class LauncherService(Service):
 
         if not terms:
             self._apps_by_id = {}
-            self.items = []
-            self.selected_index = -1
-            logger.debug("launcher service: cleared items (empty query)")
+            self.items = prefix_items
+            if prefix_items:
+                self.selected_index = 0
+            else:
+                self.selected_index = -1
+                logger.debug("launcher service: cleared items (empty query)")
             return
 
         for idx, app in enumerate(self._all_apps):
@@ -188,14 +262,9 @@ class LauncherService(Service):
             primary_labels = self._normalized_primary_labels(app)
             fallback_labels = self._normalized_secondary_labels(app)
             search_labels: List[str] = primary_labels or fallback_labels
-            if terms:
-                if not search_labels:
-                    continue
-                if not all(
-                    any(term in label for label in search_labels) for term in terms
-                ):
-                    continue
-            elif not search_labels:
+            if not search_labels:
+                continue
+            if not all(any(term in label for label in search_labels) for term in terms):
                 continue
             display = (
                 app.display_name
@@ -208,18 +277,20 @@ class LauncherService(Service):
             items.append((app_id, display))
             mapping[app_id] = app
 
+        combined_items = prefix_items + items
+
         self._apps_by_id = mapping
-        self.items = items
+        self.items = combined_items
         logger.debug(
             "launcher service: query=%r matched %d apps",
             self._query,
             len(items),
         )
 
-        if not items:
+        if not combined_items:
             self.selected_index = -1
             return
-        if self._selected_index < 0 or self._selected_index >= len(items):
+        if self._selected_index < 0 or self._selected_index >= len(combined_items):
             self.selected_index = 0
 
     @staticmethod
