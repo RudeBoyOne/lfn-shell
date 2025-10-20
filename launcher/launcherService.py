@@ -1,4 +1,5 @@
 import logging
+import unicodedata
 from typing import Dict, List, Optional, Tuple
 
 from gi.repository import GLib
@@ -162,7 +163,9 @@ class LauncherService(Service):
     def _normalized_terms(self) -> List[str]:
         if not self._query:
             return []
-        return [term for term in self._query.casefold().split() if term]
+        raw_terms = (self._query or "").split()
+        normalized_terms = [self._normalize_text(term) for term in raw_terms]
+        return [term for term in normalized_terms if term]
 
     def _rebuild_items(self) -> None:
         terms = self._normalized_terms()
@@ -186,20 +189,17 @@ class LauncherService(Service):
                 or f"app-{idx}"
             )
             app_id = self._deduplicate_id(base_id, seen)
-            blob = " ".join(
-                filter(
-                    None,
-                    [
-                        app.display_name,
-                        app.generic_name,
-                        app.name,
-                        app.description,
-                        app.command_line,
-                        app.executable,
-                    ],
-                )
-            ).casefold()
-            if terms and not all(term in blob for term in terms):
+            primary_labels = self._normalized_primary_labels(app)
+            fallback_labels = self._normalized_secondary_labels(app)
+            search_labels: List[str] = primary_labels or fallback_labels
+            if terms:
+                if not search_labels:
+                    continue
+                if not all(
+                    any(term in label for label in search_labels) for term in terms
+                ):
+                    continue
+            elif not search_labels:
                 continue
             display = (
                 app.display_name
@@ -248,3 +248,27 @@ class LauncherService(Service):
         except (RuntimeError, ValueError):
             pass
         self._query_timer_id = None
+
+    @staticmethod
+    def _normalize_text(value: Optional[str]) -> str:
+        if not value:
+            return ""
+        decomposed = unicodedata.normalize("NFD", value)
+        stripped = "".join(ch for ch in decomposed if unicodedata.category(ch) != "Mn")
+        return stripped.casefold()
+
+    def _normalized_primary_labels(self, app: DesktopApp) -> List[str]:
+        labels = [app.display_name, app.name]
+        return [
+            normalized
+            for normalized in (self._normalize_text(label) for label in labels if label)
+            if normalized
+        ]
+
+    def _normalized_secondary_labels(self, app: DesktopApp) -> List[str]:
+        labels = [app.generic_name, app.executable, app.command_line]
+        return [
+            normalized
+            for normalized in (self._normalize_text(label) for label in labels if label)
+            if normalized
+        ]
