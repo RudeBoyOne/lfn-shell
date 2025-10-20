@@ -166,21 +166,10 @@ class LauncherBox(Box):
             self.queue_resize()
             return
 
-        item_count = len(items)
-        visible_rows = max(
-            1,
-            min(item_count if item_count else 0, self._max_visible_rows),
-        )
-        desired_height = self._row_height * visible_rows
-        try:
-            self.scroll.set_min_content_height(desired_height)
-        except AttributeError:
-            self.scroll.set_size_request(-1, desired_height)
-        self.scroll.set_vexpand(item_count > self._max_visible_rows)
-
         if not items:
             self._render_empty_state()
             self.show_all()
+            self._update_scroll_height(0)
             return
 
         for index, (app_id, display) in enumerate(items):
@@ -188,6 +177,7 @@ class LauncherBox(Box):
             self.viewport.add(button)
             self._buttons.append(button)
 
+        self._update_scroll_height(len(self._buttons))
         self.show_all()
         self._sync_selection()
         self._ensure_selection_visible()
@@ -322,3 +312,24 @@ class LauncherBox(Box):
             return
         self.service.selected_index = index
         self.service.launch_selected()
+
+    def _update_scroll_height(self, item_count: int) -> None:
+        max_height = self._row_height * self._max_visible_rows
+        height = self._row_height
+        if item_count > 0:
+            get_pref = getattr(self.viewport, "get_preferred_height", None)
+            if callable(get_pref):
+                minimum, natural = get_pref()
+                height = natural or minimum or (self._row_height * item_count)
+            else:
+                height = self._row_height * item_count
+            height = max(self._row_height, min(height, max_height))
+        self._apply_scroll_height(height, item_count > self._max_visible_rows)
+
+    def _apply_scroll_height(self, height: int, expand: bool) -> None:
+        try:
+            self.scroll.set_min_content_height(height)
+        except AttributeError:
+            self.scroll.set_size_request(-1, height)
+        if hasattr(self.scroll, "set_vexpand"):
+            self.scroll.set_vexpand(expand)
