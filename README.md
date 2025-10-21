@@ -8,9 +8,11 @@
 ![clipboard preview](./preview/clipboard.png)
 
 - [x] power-menu
+
 ![power menu preview](./preview/power_menu.png)
 
 - [x] launcher apps
+
 ![launcher preview](./preview/launcher.png)
 
 - [ ] notifications
