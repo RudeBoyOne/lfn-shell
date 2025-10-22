@@ -23,7 +23,7 @@
 }
 
 #clipbar-text {
-    color: #e0e0e0;
+    color: var(--on-surface);
     font-size: 14px;
     font-weight: bold;
 }
@@ -40,7 +40,7 @@
 }
 
 #clipbar-count {
-    color: #e0e0e0;
+    color: var(--on-surface);
     font-size: 16px;
     font-weight: bold;
     margin-right: 8px;

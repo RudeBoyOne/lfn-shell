@@ -23,7 +23,7 @@ class LauncherLayer(SingletonLayerMixin, Window):
             keyboard_mode="exclusive",
             all_visible=True,
             child=box,
-            margin="300px 0px 0px 0px",
+            margin="250px 0px 0px 0px",
         )
         self.service = service
         self.child = box
