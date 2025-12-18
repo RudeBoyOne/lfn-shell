@@ -6,13 +6,16 @@
   background-color: var(--background-blur-no-active);
   padding: 20px;
   border-radius: 10px;
+  border: 1px solid var(--surface-bright);
 }
 
 #power-menu-button {
+  font-family: 'Ubuntu Nerd Font Propo';
   background-color: var(--background-blur-no-active);
   border-radius: 8px;
   padding: 10px;
   border: 2px solid transparent;
+  box-shadow: var(--shadow) -1px -1px 3px -1px, var(--shadow) 1px 1px 3px -1px;
   min-width: 68px;
   min-height: 68px;
 }
@@ -23,6 +26,7 @@
 }
 
 #power-menu-button:focus, #power-menu-button:focus-within, #power-menu-button.suggested-action {
+  /* border: 2px solid; */
   border-color: var(--primary);
   background-color: var(--inverse-primary);
 }

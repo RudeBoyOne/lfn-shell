@@ -15,6 +15,7 @@ class PowerLayer(SingletonLayerMixin, Window):
         menu = PowerMenu(controller=service)
 
         super().__init__(
+            title="power-menu",
             name="power-menu-layer",
             type="top-level",
             anchor="left",

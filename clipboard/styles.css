@@ -47,6 +47,7 @@
 }
 
 #clipbar-clear {
+    font-family: 'Ubuntu Nerd Font Propo';
     border: 2px solid var(--on-error);
     border-radius: 5px;
 }

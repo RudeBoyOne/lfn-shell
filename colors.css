@@ -1,22 +1,22 @@
 :vars {
-  --background-blur-no-active: rgba(15, 20, 23, 0.2);
-  --background-blur-active: rgba(15, 20, 23, 0.5);
-  --foreground: #dee3e6;
-  --background: #0f1417;
-  --cursor: #dee3e6;
-  --primary: #89d0ee;
-  --on-primary: #003545;
-  --secondary: #b4cad5;
-  --on-secondary: #1e333c;
-  --tertiary: #c4c3ea;
-  --on-tertiary: #2d2d4d;
-  --surface: #0f1417;
-  --surface-bright: #353a3d;
+  --background-blur-no-active: rgba(16, 20, 24, 0.2);
+  --background-blur-active: rgba(16, 20, 24, 0.5);
+  --foreground: #e0e2e8;
+  --background: #101418;
+  --cursor: #e0e2e8;
+  --primary: #99ccfa;
+  --on-primary: #003351;
+  --secondary: #b8c8da;
+  --on-secondary: #23323f;
+  --tertiary: #d1bfe7;
+  --on-tertiary: #372a4a;
+  --surface: #101418;
+  --surface-bright: #36393e;
   --error: #ffb4ab;
-  --error-dim: #ff8678;
+  --error-dim: #000000;
   --on-error: #690005;
   --error-container: #93000a;
-  --outline: #8a9296;
+  --outline: #8c9198;
   --shadow: #000000;
-  --inverse-primary: #0d6680;
+  --inverse-primary: #2c638b;
 }
