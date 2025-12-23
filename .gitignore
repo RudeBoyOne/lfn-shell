@@ -8,3 +8,4 @@ venv
 *.pyd
 *.pdb
 .github/
+colors.css
