@@ -1,5 +1,6 @@
 from gi.repository import GLib
 
+from fabric.utils.helpers import exec_shell_command_async
 from widgets.WindowWayland import WaylandWindow as Window
 from power_menu.powerBox import PowerMenu
 from power_menu.powerService import PowerService

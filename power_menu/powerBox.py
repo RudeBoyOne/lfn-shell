@@ -5,11 +5,6 @@ from fabric.widgets.label import Label
 from .assets import icons
 from .powerService import PowerService
 
-tooltip_lock = "Lock"
-tooltip_logout = "Logout"
-tooltip_reboot = "Reboot"
-tooltip_shutdown = "Shutdown"
-
 
 class PowerMenu(Box):
     """Box (UI) do menu de energia.
@@ -32,8 +27,7 @@ class PowerMenu(Box):
 
         self.btn_lock = Button(
             name="power-menu-button",
-            tooltip_markup=tooltip_lock,
-            child=Label(name="button-label", markup=icons.lock),
+            child=Label(markup=icons.lock),
             on_clicked=lambda *_: self.service.lock_session(),
             h_expand=False,
             v_expand=False,
@@ -42,8 +36,7 @@ class PowerMenu(Box):
         )
         self.btn_logout = Button(
             name="power-menu-button",
-            tooltip_markup=tooltip_logout,
-            child=Label(name="button-label", markup=icons.logout),
+            child=Label(markup=icons.logout),
             on_clicked=lambda *_: self.service.logout_session(),
             h_expand=False,
             v_expand=False,
@@ -52,8 +45,7 @@ class PowerMenu(Box):
         )
         self.btn_reboot = Button(
             name="power-menu-button",
-            tooltip_markup=tooltip_reboot,
-            child=Label(name="button-label", markup=icons.reboot),
+            child=Label(markup=icons.reboot),
             on_clicked=lambda *_: self.service.reboot_system(),
             h_expand=False,
             v_expand=False,
@@ -62,8 +54,7 @@ class PowerMenu(Box):
         )
         self.btn_shutdown = Button(
             name="power-menu-button",
-            tooltip_markup=tooltip_shutdown,
-            child=Label(name="button-label", markup=icons.shutdown),
+            child=Label(markup=icons.shutdown),
             on_clicked=lambda *_: self.service.shutdown_system(),
             h_expand=False,
             v_expand=False,

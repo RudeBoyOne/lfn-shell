@@ -1,12 +1,11 @@
 import os
+import util.actions as actions
 
 from gi.repository import GLib
 from fabric import Application
 from fabric.utils import get_relative_path
 
-from clipboard.clipboardLayer import ClipboardLayer
-from power_menu.powerLayer import PowerLayer
-from launcher.launcherLayer import LauncherLayer
+from util.send_start_notification import send_start_notification
 
 
 if __name__ == "__main__":
@@ -21,5 +20,7 @@ if __name__ == "__main__":
     app.set_css = set_css
 
     app.set_css()
+
+    send_start_notification()
 
     app.run()

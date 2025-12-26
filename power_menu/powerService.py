@@ -18,18 +18,15 @@ class PowerService(Service):
     """
 
     @Signal
-    def close_requested(self) -> None: ...
-
-    @Signal
-    def action_executed(self, action: str) -> None: ...
+    def close_requested(self, action: str) -> None: ...
 
     @Signal
     def action_failed(self, action: str, message: str) -> None: ...
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.action = ""
 
-    # helpers
     def _run(self, action: str, cmd: str):
         """Executa comando assíncrono e sinaliza resultado.
 
@@ -37,15 +34,14 @@ class PowerService(Service):
         """
         try:
             exec_shell_command_async(cmd)
-            self.action_executed(action)
         except Exception as e:
             logger.exception("power action failed: %s", action)
             self.action_failed(action, str(e))
         finally:
-            # Fecha menu após qualquer ação (comportamento simples; pode evoluir no futuro)
-            self.request_close()
+            self.action = action
+            self.close_requested(self.action)
 
-    # ações públicas
+    # public actions
     def lock_session(self):
         self._run("lock", "hyprlock")
 
@@ -57,7 +53,3 @@ class PowerService(Service):
 
     def shutdown_system(self):
         self._run("shutdown", "systemctl poweroff")
-
-    # fechamento
-    def request_close(self):
-        self.close_requested()
