@@ -1,5 +1,5 @@
 import os
-import util.actions as actions
+import actions.launch_widgets.launch_widgets_actions as launch_widgets_actions
 
 from gi.repository import GLib
 from fabric import Application

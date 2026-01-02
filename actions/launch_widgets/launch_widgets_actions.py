@@ -1,5 +1,5 @@
 from fabric import Application
-from util.widget_resolver import launch_widget
+from actions.launch_widgets.widget_resolver import launch_widget
 
 
 @Application.action("widget")

@@ -2,7 +2,8 @@
   background-color: var(--background-blur-no-active);
   padding: 20px;
   border-radius: 10px;
-  border: 1px solid var(--surface-bright);
+  /* border: 1px solid var(--surface-bright); */
+  border: 2px solid var(--primary);
 }
 
 #power-menu-button {
