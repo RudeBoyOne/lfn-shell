@@ -24,6 +24,7 @@ class ClipboardLayer(SingletonLayerMixin, Window):
         )
 
         super().__init__(
+            title="clipboard",
             name="clipboard-layer",
             type="top-level",
             anchor="left bottom right",

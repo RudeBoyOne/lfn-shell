@@ -16,6 +16,7 @@ class LauncherLayer(SingletonLayerMixin, Window):
         box = LauncherBox(controller=service)
 
         super().__init__(
+            title="launcher",
             name="launcher-layer",
             anchor="top",
             layer="overlay",
