@@ -51,7 +51,7 @@ class LauncherBox(Box):
             h_expand=True,
             v_expand=True,
             h_align="fill",
-            v_align="fill",
+            v_align="center",
         )
 
         self.scroll = ScrolledWindow(
@@ -66,7 +66,7 @@ class LauncherBox(Box):
         if hasattr(self.scroll, "set_no_show_all"):
             self.scroll.set_no_show_all(True)
         self._max_visible_rows = 4
-        self._row_height = 63
+        self._row_height = 73
 
         self.add(self.search_entry)
         self.add(self.scroll)
