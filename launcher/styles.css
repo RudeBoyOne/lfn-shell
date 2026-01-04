@@ -1,33 +1,30 @@
 #launcher-root {
     background-color: var(--background-blur-no-active);
-    border-radius: 8px;
+    border: 2px solid var(--primary);
+    border-radius: 6px;
 }
 
 #launcher-search {
     background-color: var(--background-blur-no-active);
-    border: 2px solid var(--primary);
     border-radius: 6px;
-    padding: 6px;
-    font-size: 16px;
+    padding: 5px 10px;
+    color: var(--foreground);
+    font-size: 19px;
+    font-weight: bold;
 }
 
 #launcher-scroll {
-    border-radius: 6px;
     padding: 6px;
-}
-
-#launcher-list {
-    padding: 4px 0;
 }
 
 #launcher-item {
     background-color: var(--background-blur-no-active);
     border-radius: 6px;
-    padding: 8px;
+    padding: 6px;
 }
 
 #launcher-item:hover {
-    background-color: var(--primary-container);
+    background-color: var(--inverse-primary);
 }
 
 #launcher-item.launcher-item-selected {
@@ -35,12 +32,13 @@
 }
 
 #launcher-item-title {
-    color: var(--on-surface);
-    font-size: 14px;
+    color: var(--foreground);
+    font-size: 15px;
     font-weight: bold;
 }
 
 #launcher-empty {
-    color: var(--outline);;
-    font-style: italic;
+    font-size: 19px;
+    font-weight: bold;
+    color: var(--foreground);
 }

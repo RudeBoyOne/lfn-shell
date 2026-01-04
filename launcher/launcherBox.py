@@ -20,13 +20,12 @@ class LauncherBox(Box):
     def __init__(
         self,
         controller: Optional[LauncherService] = None,
-        icon_size: int = 32,
+        icon_size: int = 39,
         **kwargs,
     ):
         super().__init__(
             name="launcher-root",
             orientation="v",
-            spacing=8,
             h_expand=True,
             v_expand=False,
             **kwargs,
@@ -44,13 +43,6 @@ class LauncherBox(Box):
         self.search_entry.connect("changed", self._on_search_changed)
         self.search_entry.connect("activate", self._on_entry_activate)
 
-        header = Box(
-            orientation="h",
-            spacing=8,
-            h_expand=True,
-            h_align="fill",
-        )
-        header.add(self.search_entry)
 
         self.viewport = Box(
             name="launcher-list",
@@ -69,17 +61,14 @@ class LauncherBox(Box):
             v_expand=False,
             h_align="fill",
             v_align="fill",
-            propagate_width=False,
-            propagate_height=False,
         )
         self.scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         if hasattr(self.scroll, "set_no_show_all"):
             self.scroll.set_no_show_all(True)
-        self.scroll.hide()
         self._max_visible_rows = 4
-        self._row_height = max(self.icon_size + 17, 64)
+        self._row_height = 63
 
-        self.add(header)
+        self.add(self.search_entry)
         self.add(self.scroll)
 
         self._buttons = []
@@ -177,7 +166,7 @@ class LauncherBox(Box):
         if not items:
             self._render_empty_state()
             self.show_all()
-            self._update_scroll_height(0)
+            self._update_scroll_height(1)
             return
 
         for index, (app_id, display) in enumerate(items):
@@ -212,7 +201,6 @@ class LauncherBox(Box):
         content = Box(
             name="launcher-item-box",
             orientation="h",
-            spacing=8,
             h_expand=True,
             v_expand=False,
             h_align="fill",
@@ -222,7 +210,6 @@ class LauncherBox(Box):
         title_label = Label(
             name="launcher-item-title",
             label=title,
-            ellipsization="end",
             h_expand=True,
             h_align="fill",
         )
@@ -235,6 +222,7 @@ class LauncherBox(Box):
             v_expand=False,
             h_align="fill",
             v_align="center",
+            size=50
         )
         button.connect("clicked", lambda btn, *_: self._on_button_clicked(btn))
         setattr(button, "_launcher_index", index)
@@ -322,30 +310,23 @@ class LauncherBox(Box):
         self.service.launch_selected()
 
     def _update_scroll_height(self, item_count: int) -> None:
-        max_height = self._row_height * self._max_visible_rows
-        children = list(self.viewport.get_children())
-        if not children:
+        """Calcula e aplica altura baseada estritamente no número de itens."""
+        if item_count <= 0:
             self._apply_scroll_height(0, False)
             return
-
-        get_pref = getattr(self.viewport, "get_preferred_height", None)
-        if callable(get_pref):
-            minimum, natural = get_pref()
-            height = natural or minimum or self._row_height
-        else:
-            height = self._row_height * max(1, item_count)
-
-        if item_count > 0:
-            height = max(self._row_height, min(height, max_height))
-        else:
-            height = max(self._row_height, height)
-
-        self._apply_scroll_height(height, item_count > self._max_visible_rows)
+        
+        # Altura = número de itens * altura fixa por linha
+        # Limitado ao máximo de linhas visíveis
+        visible_rows = min(item_count, self._max_visible_rows)
+        height = visible_rows * self._row_height
+        
+        # Expande scroll apenas se exceder o máximo
+        needs_scroll = item_count > self._max_visible_rows
+        
+        self._apply_scroll_height(height, needs_scroll)
 
     def _apply_scroll_height(self, height: int, expand: bool) -> None:
-        try:
-            self.scroll.set_min_content_height(height)
-        except AttributeError:
-            self.scroll.set_size_request(-1, height)
+        """Aplica altura ao scroll de forma consistente."""
+        self.scroll.set_size_request(-1, height)
         if hasattr(self.scroll, "set_vexpand"):
             self.scroll.set_vexpand(expand)

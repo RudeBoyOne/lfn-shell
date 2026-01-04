@@ -20,7 +20,7 @@ def handle_query(query: str) -> Optional[RouterResult]:
         result.items.append(
             (
                 "__special__:web-search:hint",
-                "Digite um termo para pesquisar na web",
+                "Pesquisar na web",
             )
         )
         return result
